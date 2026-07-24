@@ -1,0 +1,70 @@
+/* Smart Cat Collar — Custom Styles (beyond Tailwind) */
+
+/* Smooth page transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Setup wizard card transition */
+[data-step] {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cat card hover effect */
+#cat-grid a:hover {
+  transform: translateY(-2px);
+}
+
+/* Mini chart bars animation */
+#cat-grid .bg-gray-50 div {
+  animation: growBar 0.3s ease-out;
+}
+
+@keyframes growBar {
+  from { height: 0; }
+}
+
+/* Notification badge pulse */
+.bg-red-500.text-white.text-xs.rounded-full {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* Toggle switch smooth */
+.peer:checked ~ * {
+  transition: all 0.2s ease;
+}
+
+/* Scrollbar styling for settings tabs */
+nav::-webkit-scrollbar {
+  display: none;
+}
+nav {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Alert banner slide in */
+.bg-red-500.text-white,
+.bg-amber-500.text-white {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Desktop notification mock shadow */
+.bg-gray-800.rounded-xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}

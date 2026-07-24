@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Cat Collar — Setup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-page="setup" class="min-h-screen bg-gray-50">
+
+  <!-- Progress Bar -->
+  <div class="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-50">
+    <div id="setup-progress" class="h-full bg-orange-500 transition-all duration-300" style="width: 20%"></div>
+  </div>
+
+  <div class="max-w-lg mx-auto px-4 py-12">
+
+    <!-- Step Indicators -->
+    <div class="flex items-center justify-center gap-2 mb-8">
+      <div id="step-dot-1" class="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-bold">1</div>
+      <div class="w-6 h-0.5 bg-gray-200"></div>
+      <div id="step-dot-2" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">2</div>
+      <div class="w-6 h-0.5 bg-gray-200"></div>
+      <div id="step-dot-3" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">3</div>
+      <div class="w-6 h-0.5 bg-gray-200"></div>
+      <div id="step-dot-4" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">4</div>
+      <div class="w-6 h-0.5 bg-gray-200"></div>
+      <div id="step-dot-5" class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-sm font-bold">5</div>
+    </div>
+
+    <!-- Step 1: Welcome -->
+    <div data-step="1" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+      <div class="text-6xl mb-4">🐱</div>
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">Welcome to Smart Cat Collar</h1>
+      <p class="text-gray-500 mb-6">Monitor your cat's health in real time. Temperature, heart rate, and activity tracking — all from your desktop.</p>
+      <div class="bg-orange-50 rounded-xl p-4 mb-6 text-left">
+        <p class="text-sm text-orange-800 font-medium">This setup takes about 2 minutes. You'll:</p>
+        <ul class="text-sm text-orange-700 mt-2 space-y-1">
+          <li>🐱 Add your first cat</li>
+          <li>📡 Choose a data source</li>
+          <li>⚠️ Set alert thresholds</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 2: Add Cat -->
+    <div data-step="2" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hidden">
+      <div class="text-4xl mb-4 text-center">🐾</div>
+      <h2 class="text-xl font-bold text-gray-800 mb-1 text-center">Add Your First Cat</h2>
+      <p class="text-gray-500 text-sm mb-6 text-center">You can add more cats later from Settings.</p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+          <input type="text" id="cat-name" value="Antifa" placeholder="Your cat's name" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Breed</label>
+          <select id="cat-breed" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white">
+            <option value="Domestic Shorthair">Domestic Shorthair</option>
+            <option value="Persian">Persian</option>
+            <option value="Siamese">Siamese</option>
+            <option value="Maine Coon">Maine Coon</option>
+            <option value="British Shorthair">British Shorthair</option>
+            <option value="Ragdoll">Ragdoll</option>
+            <option value="Bengal">Bengal</option>
+            <option value="Sphynx">Sphynx</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Photo (optional)</label>
+          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-orange-400 transition-colors">
+            <p class="text-gray-400 text-sm">📷 Click to upload a photo</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Birth Year (optional)</label>
+          <input type="number" placeholder="2020" min="2000" max="2026" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none">
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Choose Provider -->
+    <div data-step="3" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hidden">
+      <div class="text-4xl mb-4 text-center">📡</div>
+      <h2 class="text-xl font-bold text-gray-800 mb-1 text-center">Choose Data Source</h2>
+      <p class="text-gray-500 text-sm mb-6 text-center">How should the app receive sensor data from the collar?</p>
+
+      <div class="space-y-3">
+        <label class="flex items-start gap-3 p-4 border-2 border-orange-500 bg-orange-50 rounded-xl cursor-pointer">
+          <input type="radio" name="provider" value="mock" checked class="mt-1 accent-orange-500">
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-gray-800">🧪 Mock Data</span>
+              <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">Recommended</span>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">Generates realistic fake data. Great for testing before the collar is assembled.</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-4 border-2 border-gray-200 hover:border-gray-300 rounded-xl cursor-pointer transition-colors">
+          <input type="radio" name="provider" value="direct-api" class="mt-1 accent-orange-500">
+          <div class="flex-1">
+            <span class="font-medium text-gray-800">🔌 Direct API</span>
+            <p class="text-sm text-gray-500 mt-1">Collar sends data directly to the desktop app via a tunnel URL.</p>
+          </div>
+        </label>
+
+        <label class="flex items-start gap-3 p-4 border-2 border-gray-200 hover:border-gray-300 rounded-xl cursor-pointer transition-colors">
+          <input type="radio" name="provider" value="telegram" class="mt-1 accent-orange-500">
+          <div class="flex-1">
+            <span class="font-medium text-gray-800">✈️ Telegram Bot</span>
+            <p class="text-sm text-gray-500 mt-1">Receive collar data via Telegram Bot API. Fallback option.</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Step 4: Thresholds -->
+    <div data-step="4" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 hidden">
+      <div class="text-4xl mb-4 text-center">⚠️</div>
+      <h2 class="text-xl font-bold text-gray-800 mb-1 text-center">Set Alert Thresholds</h2>
+      <p class="text-gray-500 text-sm mb-4 text-center">When should the app alert you? You can change these later.</p>
+
+      <button onclick="useDefaults()" class="w-full mb-4 text-sm text-orange-600 hover:text-orange-700 font-medium py-2 border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors">
+        ✨ Use recommended values
+      </button>
+
+      <div class="space-y-4">
+        <div class="bg-red-50 rounded-xl p-4">
+          <h3 class="text-sm font-bold text-red-800 mb-3">🌡️ Temperature</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-red-600">Warning (°C)</label>
+              <input type="number" id="temp-warning" value="39.0" step="0.1" class="w-full px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400 outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-red-600">Critical (°C)</label>
+              <input type="number" id="temp-critical" value="39.5" step="0.1" class="w-full px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400 outline-none">
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-amber-50 rounded-xl p-4">
+          <h3 class="text-sm font-bold text-amber-800 mb-3">❤️ Heart Rate (BPM)</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-amber-600">Warning</label>
+              <input type="number" id="bpm-warning" value="220" class="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+            </div>
+            <div>
+              <label class="text-xs text-amber-600">Critical</label>
+              <input type="number" id="bpm-critical" value="250" class="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Done -->
+    <div data-step="5" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center hidden">
+      <div class="text-6xl mb-4">🎉</div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">All Set!</h2>
+      <p class="text-gray-500 mb-6">Your Smart Cat Collar companion is ready.</p>
+
+      <div class="bg-gray-50 rounded-xl p-4 text-left mb-6 space-y-2">
+        <p class="text-sm"><span class="text-gray-500">Cat:</span> <span class="font-medium text-gray-800" id="summary-cat">Cuscino</span></p>
+        <p class="text-sm"><span class="text-gray-500">Data source:</span> <span class="font-medium text-gray-800">Mock Data</span></p>
+        <p class="text-sm"><span class="text-gray-500">Temp critical:</span> <span class="font-medium text-red-600">39.5°C</span></p>
+        <p class="text-sm"><span class="text-gray-500">BPM critical:</span> <span class="font-medium text-amber-600">250</span></p>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="flex justify-between mt-6">
+      <button id="btn-prev" onclick="prevStep()" class="px-6 py-2.5 text-gray-600 hover:text-gray-800 font-medium rounded-lg hover:bg-gray-100 transition-colors hidden">Back</button>
+      <div class="flex-1"></div>
+      <button id="btn-next" onclick="nextStep()" class="px-8 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors">Next</button>
+    </div>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

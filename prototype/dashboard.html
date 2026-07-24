@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Cat Collar — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-page="dashboard" class="min-h-screen bg-gray-50">
+
+  <!-- Top Bar -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🐱</span>
+        <h1 class="text-lg font-bold text-gray-800">Smart Cat Collar</h1>
+        <span class="text-xs text-gray-400">v0.1.0</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="alert.html" class="relative text-xl hover:scale-110 transition-transform">
+          🔔
+          <span class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">2</span>
+        </a>
+        <a href="settings.html" class="text-xl hover:scale-110 transition-transform">⚙️</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Alert Banner (shown when critical) -->
+  <div class="bg-red-500 text-white px-4 py-2 text-center text-sm font-medium">
+    🚨 Grogu has a fever! Temperature: 39.8°C — <a href="cat-detail.html?id=4" class="underline">View Details</a>
+  </div>
+
+  <main class="max-w-5xl mx-auto px-4 py-6">
+
+    <!-- Cat Cards -->
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-gray-800">Your Cats</h2>
+      <button class="text-sm text-orange-600 hover:text-orange-700 font-medium">+ Add Cat</button>
+    </div>
+
+    <div id="cat-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Alert Log -->
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-gray-800">Recent Alerts</h2>
+      <a href="alert.html" class="text-sm text-orange-600 hover:text-orange-700 font-medium">View All</a>
+    </div>
+
+    <div id="alert-log" class="mb-8">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+        <p class="text-2xl font-bold text-orange-500">7</p>
+        <p class="text-xs text-gray-500">Cats Monitored</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+        <p class="text-2xl font-bold text-red-500">2</p>
+        <p class="text-xs text-gray-500">Active Alerts</p>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-4 text-center">
+        <p class="text-2xl font-bold text-teal-500">1,247</p>
+        <p class="text-xs text-gray-500">Readings Today</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            native_os: win
+            artifact_ext: exe
+          - os: ubuntu-latest
+            native_os: linux
+            artifact_ext: AppImage
+          - os: macos-latest
+            native_os: mac
+            artifact_ext: dmg
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, curl, gd, bcmath, sqlite3, zip, fileinfo
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup problem matchers for PHP
+        run: echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+
+      - name: Configure composer auth
+        run: composer config --no-interaction allow-plugins.nativephp/electron true
+
+      - name: Install PHP dependencies (production)
+        env:
+          COMPOSER_PROCESS_TIMEOUT: 1800
+        run: composer install --no-dev --optimize-autoloader --no-interaction
+
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets (Vite)
+        run: npm run build
+
+      - name: Build desktop app (${{ matrix.os }})
+        env:
+          NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
+          NATIVEPHP_APP_ID: com.smartcatcollar.desktop
+          NATIVEPHP_APP_AUTHOR: pacificDev
+          NATIVEPHP_APP_COPYRIGHT: "© ${{ github.ref_name }} pacificDev"
+          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar — Desktop Companion App"
+          NATIVEPHP_APP_WEBSITE: "https://github.com/${{ github.repository }}"
+          APP_NAME: "Smart Cat Collar"
+          APP_URL: "http://localhost"
+          APP_ENV: production
+          APP_DEBUG: false
+          LOG_LEVEL: error
+        run: php artisan native:build ${{ matrix.native_os }} --no-interaction
+
+      - name: List build artifacts
+        run: |
+          echo "=== dist/ contents ==="
+          ls -la dist/
+          echo "=== dist/*-unpacked/ (if exists) ==="
+          ls -la dist/*-unpacked/ 2>/dev/null || echo "(none)"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-cat-collar-${{ matrix.native_os }}-${{ github.ref_name }}
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*.AppImage
+            dist/*.AppImage.blockmap
+            dist/*.deb
+            dist/*.rpm
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.yml
+            dist/*.yaml
+            dist/latest*.yml
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: smart-cat-collar-*
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Smart Cat Collar ${{ github.ref_name }}
+
+            Desktop Companion App for Smart Cat Collar.
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Windows  | `Smart Cat Collar-*.exe` |
+            | macOS    | `Smart Cat Collar-*.dmg` |
+            | Linux    | `Smart Cat Collar-*.AppImage` |
+
+            ### Installation
+
+            - **Windows**: Run the `.exe` installer.
+            - **macOS**: Open the `.dmg` and drag to Applications.
+            - **Linux**: Make the `.AppImage` executable (`chmod +x`) and run.
+
+            ### Changelog
+
+            See the commit history for details.
+          draft: true
+          prerelease: false
+          files: |
+            ./*
+          fail_on_unmatched_files: false

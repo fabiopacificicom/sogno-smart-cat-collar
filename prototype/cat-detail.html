@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Cat Collar — Cat Detail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-page="cat-detail" class="min-h-screen bg-gray-50">
+
+  <!-- Top Bar -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+      <a href="dashboard.html" class="text-xl hover:scale-110 transition-transform">←</a>
+      <span class="text-2xl" id="cat-avatar">🐱</span>
+      <h1 class="text-lg font-bold text-gray-800" id="cat-name-header">Cuscino</h1>
+      <span id="cat-status" class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Critical</span>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6">
+
+    <!-- Vitals Grid -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+        <p class="text-xs text-gray-500 mb-1">🌡️ Temperature</p>
+        <p id="cat-temp" class="text-3xl font-bold text-red-500">39.8°C</p>
+        <p class="text-xs text-red-400 mt-1">↑ Rising</p>
+        <div class="mt-3 h-16 bg-gray-50 rounded flex items-end justify-around px-2">
+          <div class="w-3 bg-red-300 rounded-t" style="height:60%"></div>
+          <div class="w-3 bg-red-400 rounded-t" style="height:70%"></div>
+          <div class="w-3 bg-red-400 rounded-t" style="height:75%"></div>
+          <div class="w-3 bg-red-500 rounded-t" style="height:85%"></div>
+          <div class="w-3 bg-red-500 rounded-t" style="height:90%"></div>
+          <div class="w-3 bg-red-600 rounded-t" style="height:95%"></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+        <p class="text-xs text-gray-500 mb-1">❤️ Heart Rate</p>
+        <p id="cat-bpm" class="text-3xl font-bold text-red-500">260</p>
+        <p class="text-xs text-red-400 mt-1">↑ Rising</p>
+        <div class="mt-3 h-16 bg-gray-50 rounded flex items-end justify-around px-2">
+          <div class="w-3 bg-amber-300 rounded-t" style="height:50%"></div>
+          <div class="w-3 bg-amber-400 rounded-t" style="height:60%"></div>
+          <div class="w-3 bg-amber-400 rounded-t" style="height:65%"></div>
+          <div class="w-3 bg-red-400 rounded-t" style="height:80%"></div>
+          <div class="w-3 bg-red-500 rounded-t" style="height:85%"></div>
+          <div class="w-3 bg-red-600 rounded-t" style="height:92%"></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+        <p class="text-xs text-gray-500 mb-1">🏃 Activity</p>
+        <p id="cat-activity" class="text-3xl font-bold text-gray-800">Low</p>
+        <p class="text-xs text-gray-400 mt-1">→ Stable</p>
+        <div class="mt-3 h-16 bg-gray-50 rounded flex items-end justify-around px-2">
+          <div class="w-3 bg-teal-300 rounded-t" style="height:70%"></div>
+          <div class="w-3 bg-teal-400 rounded-t" style="height:60%"></div>
+          <div class="w-3 bg-gray-300 rounded-t" style="height:40%"></div>
+          <div class="w-3 bg-gray-300 rounded-t" style="height:35%"></div>
+          <div class="w-3 bg-gray-200 rounded-t" style="height:25%"></div>
+          <div class="w-3 bg-gray-200 rounded-t" style="height:20%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thresholds -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+      <h3 class="text-sm font-bold text-gray-700 mb-2">Current Thresholds</h3>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-gray-500">🌡️ Temp Warning: <span class="font-medium text-amber-600">39.0°C</span></p>
+          <p class="text-gray-500">🌡️ Temp Critical: <span class="font-medium text-red-600">39.5°C</span></p>
+        </div>
+        <div>
+          <p class="text-gray-500">❤️ BPM Warning: <span class="font-medium text-amber-600">220</span></p>
+          <p class="text-gray-500">❤️ BPM Critical: <span class="font-medium text-red-600">250</span></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Readings History -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+      <h3 class="text-sm font-bold text-gray-700 mb-3">Recent Readings</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="py-2 text-left text-xs text-gray-500 font-medium">Time</th>
+              <th class="py-2 text-left text-xs text-gray-500 font-medium">Temp</th>
+              <th class="py-2 text-left text-xs text-gray-500 font-medium">BPM</th>
+              <th class="py-2 text-left text-xs text-gray-500 font-medium">Activity</th>
+              <th class="py-2 text-left text-xs text-gray-500 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody id="readings-table">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Alert History -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+      <h3 class="text-sm font-bold text-gray-700 mb-3">Alert History</h3>
+      <div id="cat-alert-history">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3">
+      <button class="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">✏️ Edit Cat</button>
+      <button class="px-4 py-2 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors">🗑️ Delete Cat</button>
+    </div>
+
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
