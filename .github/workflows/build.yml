@@ -69,6 +69,7 @@ jobs:
 
       - name: Build desktop app (${{ matrix.os }})
         env:
+          NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
           NATIVEPHP_APP_ID: com.smartcatcollar.desktop
           NATIVEPHP_APP_AUTHOR: pacificDev
           NATIVEPHP_APP_COPYRIGHT: "© ${{ github.ref_name }} pacificDev"
@@ -79,12 +80,7 @@ jobs:
           APP_ENV: production
           APP_DEBUG: false
           LOG_LEVEL: error
-        run: |
-          # Strip leading 'v' from version tag for electron-builder compatibility
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          export NATIVEPHP_APP_VERSION="$VERSION"
-          php artisan native:build ${{ matrix.native_os }} --no-interaction
+        run: php artisan native:build ${{ matrix.native_os }} --no-interaction
 
       - name: List build artifacts
         shell: bash
@@ -99,13 +95,21 @@ jobs:
         with:
           name: smart-cat-collar-${{ matrix.native_os }}-${{ github.ref_name }}
           path: |
-            dist/*
-            dist/*.blockmap
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*.AppImage
+            dist/*.AppImage.blockmap
+            dist/*.deb
+            dist/*.rpm
+            dist/*.tar.gz
+            dist/*.zip
             dist/*.yml
             dist/*.yaml
             dist/latest*.yml
-            !dist/*-unpacked
-            !dist/*-unpacked/**
+            dist/*.nupkg
+            dist/RELEASES
           if-no-files-found: warn
 
   release:
