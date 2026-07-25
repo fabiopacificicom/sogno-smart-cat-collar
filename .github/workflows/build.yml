@@ -80,7 +80,13 @@ jobs:
           APP_ENV: production
           APP_DEBUG: false
           LOG_LEVEL: error
-        run: php artisan native:build ${{ matrix.native_os }} --no-interaction
+        shell: bash
+        run: |
+          # Strip leading 'v' from version tag for electron-builder compatibility
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "Using version: $VERSION"
+          NATIVEPHP_APP_VERSION="$VERSION" php artisan native:build ${{ matrix.native_os }} --no-interaction
 
       - name: List build artifacts
         shell: bash
