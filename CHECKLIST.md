@@ -16,7 +16,12 @@
 - [ ] Desktop notifications — native system notifications for critical alerts
 
 ## Phase 3 — Mobile Companion
-- [ ] Mobile App — NativePHP Mobile v3 scaffold, responsive views, push notifications
+- [ ] Notification foundation — alert-created event + listener (shared with Phase 2 desktop notifications)
+- [ ] Mobile scaffold — `nativephp/mobile` in same repo, distinct app ID, `native:mobile` scripts
+- [ ] Responsive verification — all views at 360–420px widths, touch targets ≥44px
+- [ ] Mobile sync API — pairing + read-only delta sync (see `.specs/plans/feature-mobile-sync.md`)
+- [ ] Local push notifications for `critical` alerts on mobile
+- [ ] Android build — `.apk`; iOS deferred (Mac + Apple Developer account)
 
 ## Phase 4 — Hardware Integration
 - [ ] ESP32 firmware sends data to desktop API (separate repo)

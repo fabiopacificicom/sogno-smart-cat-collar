@@ -68,12 +68,15 @@ graph TD
 
     Alerts --> Notifications
 
-    DB --> Mobile
+    Desktop -->|sync API| Mobile
+    Mobile --> MobileDB["💾 Mobile SQLite<br/>on-device copy<br/>offline-first"]
     Mobile --> Dashboard
     Mobile --> Notifications
 
     Settings --> Providers
 ```
+
+> Note: each platform has its **own** SQLite database (offline-first). The mobile app does not read the desktop's database file directly — it receives data from the desktop's sync API and stores a local copy. See `.specs/plans/feature-mobile-sync.md`.
 
 ## Chosen platforms
 - **Desktop framework:** NativePHP Desktop v2 (Laravel + Electron shell)
@@ -92,11 +95,13 @@ graph TD
 |---|---|
 | **Collar firmware (ESP32S3)** | Reads sensors, POSTs data to the desktop app's internal API — separate project, not in this codebase |
 | **Desktop app (NativePHP)** | Central data hub — receives collar data via internal API, stores in SQLite, displays dashboard, manages settings, system tray, alert logic |
-| **Mobile app (NativePHP Mobile)** | Same data displayed on mobile — responsive Livewire views, push notifications for alerts |
+| **Mobile app (NativePHP Mobile)** | Same data displayed on mobile — responsive Livewire views, local push notifications for alerts, own on-device SQLite |
 | **Internal API (Laravel routes)** | REST endpoint exposed by the desktop app — the collar POSTs sensor data here. Accessible via tunnel (ngrok, Cloudflare Tunnel, etc.) |
+| **Mobile sync API (Laravel routes)** | Read-only API exposed by the desktop app — mobile pairs with a one-time code, then pulls delta syncs of cats, readings, alerts, thresholds. See `.specs/plans/feature-mobile-sync.md` |
+| **Notification fan-out (event + listener)** | Laravel event fired when the Alert Engine creates a `critical` alert; listener dispatches to the right channel — desktop native notification, or alert record that mobile picks up via sync and raises as a local push |
 | **Communication providers** | Pluggable data sources — configurable in settings. Initially: Direct API (collar → desktop) + Telegram (fallback). Future: MQTT, WebSocket, etc. |
-| **Settings page** | Configure communication channels, alert thresholds, cat profiles, API tunnel URL, polling intervals — all from the desktop app UI |
-| **Data layer (Eloquent + SQLite)** | Stores cat profiles, sensor readings, alert history, threshold config, provider settings — shared by desktop and mobile |
+| **Settings page** | Configure communication channels, alert thresholds, cat profiles, API tunnel URL, polling intervals, paired mobile devices — all from the desktop app UI |
+| **Data layer (Eloquent + SQLite)** | Stores cat profiles, sensor readings, alert history, threshold config, provider settings — same models and migrations on both platforms, one database per device |
 | **Mock data provider** | Generates realistic fake sensor data (temp, bpm, activity, alerts) while the ESP32 is not assembled |
 | **Auto-updater** | Checks for updates on launch, downloads in background, prompts user to restart — no manual installer downloads |
 | **Initial Setup Screen** | First-boot wizard — add first cat, choose data provider, set thresholds. Only shows once, then goes to dashboard |
@@ -255,6 +260,48 @@ User clicks → quitAndInstall()
 
 **Trade-off:** Less "native" feel than React on mobile. Acceptable — the NativePHP Mobile v3 EDGE components can supplement for key interactions.
 
+### 8. Mobile data sync: read-only sync API from the desktop hub (not direct DB access)
+
+**Alternative:** Mobile app polls Telegram Bot API independently, or ships with no sync and only shows its own mock data.
+
+**Chosen option:** The desktop app exposes a read-only mobile sync API. Mobile pairs with the desktop (one-time pairing code → long-lived device token), then pulls delta syncs (cats, readings, alerts, thresholds) into its own on-device SQLite.
+
+**Why:**
+- The ADR already establishes the desktop as the central data hub — the mobile app should be a *client of the hub*, not a second independent data receiver
+- Each platform has its own SQLite database (offline-first constraint) — there is no shared database file to read; a sync API is the only consistent option
+- Read-only v1 keeps conflict handling out of scope — settings and thresholds are edited on the desktop only
+- Pairing codes avoid user accounts (single-user personal app) while still letting the desktop revoke devices
+- Works on LAN without internet; tunnel extends it to remote access using a pattern the project already has
+
+**Trade-off:** Mobile shows stale data when the desktop is unreachable. Acceptable — the desktop is the always-on home monitoring station, and mobile keeps working offline with its last synced copy. Full design: `.specs/plans/feature-mobile-sync.md`.
+
+### 9. Push notifications via shared alert event → local push on mobile
+
+**Alternative:** A remote push service (FCM/APNs from a server) that wakes the mobile app when the desktop raises an alert.
+
+**Chosen option:** A single Laravel event fired when the Alert Engine creates a `critical` alert, with listeners per channel. On mobile, alerts arrive via sync and are raised as **local** push notifications on-device. No server-side push infrastructure in v1.
+
+**Why:**
+- The Alert Engine currently only writes DB records — there is no notification hook at all, so this layer is needed for desktop native notifications (Phase 2) anyway; mobile reuses the same foundation
+- No remote push server exists in this architecture (no cloud component) — remote FCM/APNs push would require one
+- Local notifications on mobile work offline and match the sync-based design
+- Alert severities are `critical` and `warning` — only `critical` triggers push; `warning` stays in-app. (There is no `emergency` severity; earlier planning notes mentioning it were aspirational.)
+
+**Trade-off:** If the desktop is off and the collar falls back to Telegram, the mobile app won't get alerts until it syncs. Mitigation path: a future Telegram/webhook listener on mobile, or a small cloud relay — both are post-v1 decisions.
+
+### 10. NativePHP Mobile v3 in the same repo, distinct app ID
+
+**Alternative:** Separate repository for the mobile build.
+
+**Chosen option:** `composer require nativephp/mobile` in the existing repo, alongside `nativephp/electron`. The mobile build uses a distinct app ID (e.g. `com.smartcatscollar.mobile`) from the desktop build.
+
+**Why:**
+- The single-codebase decision (#1) is the whole point — views, models, providers, and the alert engine are shared verbatim
+- `nativephp/mobile` and `nativephp/electron` are separate Composer packages designed to coexist in one Laravel app
+- Distinct app IDs are required so desktop and mobile builds don't collide (stores, updaters, OS app registries)
+
+**Trade-off:** Build tooling for both platforms lives in one repo (Android SDK/Java 17 needed for mobile builds, Electron for desktop). CI matrices get longer. Acceptable.
+
 ## Constraints
 
 - **contextIsolation: true** — enforced by NativePHP (Electron shell config)
@@ -264,7 +311,10 @@ User clicks → quitAndInstall()
 - **Desktop = central data hub** — collar sends data to the desktop app's API, not the other way around
 - **Not Telegram-dependent** — Telegram is one configurable provider, not the architecture
 - **Mobile: no camera or biometrics** — the companion app only displays data
-- **Mobile: push notifications** for critical alerts (fever, severe lethargy)
+- **Mobile: push notifications** for `critical` alerts (fever, severe lethargy) — local notifications driven by sync; no remote push server in v1
+- **Mobile: distinct app ID** from the desktop build (separate store/updater identity)
+- **Mobile sync is read-only** — settings, thresholds, and cat profiles are edited on the desktop only (v1)
+- **Mobile build toolchain** — Android: Android SDK + Java 17 + signing keystore; iOS: macOS + Xcode + Apple Developer account (deferred)
 - **Mock data until hardware is ready** — `MockDataProvider` class
 - **Responsive design** — same Blade/Livewire views adapt to desktop window (800×600) and mobile screen
 - **System tray** — desktop app minimizes to tray when closed, shows cat status icon
@@ -303,7 +353,13 @@ User clicks → quitAndInstall()
 - [ ] Auto-update — electron-updater integration via NativePHP
 
 ### Phase 3 — Mobile Companion
-- [ ] Mobile App — NativePHP Mobile v3 scaffold, responsive views, push notifications
+- [ ] Notification foundation — alert-created event + listener (shared with Phase 2 desktop notifications)
+- [ ] Mobile scaffold — `nativephp/mobile` in same repo, distinct app ID, `native:mobile` scripts
+- [ ] Responsive verification — all views at 360–420px widths, touch targets ≥44px
+- [ ] Mobile sync API — pairing (one-time code → device token), read-only delta sync (cats, readings, alerts, thresholds). See `.specs/plans/feature-mobile-sync.md`
+- [ ] Local push notifications for `critical` alerts on mobile
+- [ ] Android build — `.apk` (debug + signed release)
+- [ ] iOS build — deferred (requires Mac + Apple Developer account)
 
 ### Phase 4 — Hardware Integration
 - [ ] ESP32 firmware sends data to desktop API (separate repo)
@@ -326,7 +382,9 @@ User clicks → quitAndInstall()
 |---|---|---|
 | 🔴 High | MQTT provider | Collar communicates via MQTT broker — lower power than WiFi polling, industry standard for IoT |
 | 🔴 High | WebSocket provider | Real-time desktop ↔ mobile sync without polling |
-| 🟡 Medium | Historical trend charts | 7-day and 30-day graphs for temp, bpm, activity — vet visit prep |
+| � High | Remote push relay | Small cloud component so mobile gets `critical` alerts when the desktop is unreachable — replaces sync-only local push |
+| 🟡 Medium | Mobile write-back | Edit thresholds/settings from mobile (requires conflict handling — sync API is read-only in v1) |
+| �🟡 Medium | Historical trend charts | 7-day and 30-day graphs for temp, bpm, activity — vet visit prep |
 | 🟡 Medium | Multi-cat comparison view | Side-by-side health comparison across cats |
 | 🟡 Medium | Export data (CSV/PDF) | Generate reports for vet visits — temp/bpm trends, alert history |
 | 🟡 Medium | Photo gallery | Collar camera captures stored and browsable in the app |
