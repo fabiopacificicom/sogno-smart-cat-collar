@@ -2,8 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Http\Controllers\Api\PairingController;
 use App\Models\AppSetting;
 use App\Models\Cat;
+use App\Models\Device;
 use App\Models\ProviderSetting;
 use App\Models\Threshold;
 use App\Services\ProviderManager;
@@ -34,6 +36,9 @@ class Settings extends Component
     // New cat form
     public string $newCatName = '';
     public string $newCatBreed = 'Domestic Shorthair';
+
+    // Mobile devices (pairing)
+    public ?string $pairingCode = null;
 
     public function mount(): void
     {
@@ -137,14 +142,31 @@ class Settings extends Component
         $this->dispatch('settings-saved', message: 'Cat removed.');
     }
 
+    /**
+     * Generate a fresh single-use pairing code (shown once to the user,
+     * who enters it on the phone). Valid for a short TTL.
+     */
+    public function generatePairingCode(): void
+    {
+        $this->pairingCode = PairingController::generateCode();
+    }
+
+    public function revokeDevice(int $deviceId): void
+    {
+        Device::find($deviceId)?->revoke();
+        $this->dispatch('settings-saved', message: 'Device revoked.');
+    }
+
     public function render()
     {
         $cats = Cat::orderBy('name')->get();
         $providers = app(ProviderManager::class)->all();
+        $devices = Device::orderByDesc('paired_at')->get();
 
         return view('livewire.settings', [
             'cats' => $cats,
             'providers' => $providers,
+            'devices' => $devices,
         ])
         ->layout('layouts.app');
     }

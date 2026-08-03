@@ -298,6 +298,8 @@ User clicks → quitAndInstall()
 **Alternative:** A remote push service (FCM/APNs from a server), or the paid `nativephp/mobile-local-notifications` plugin ($99) for OS-level local push on mobile.
 
 **Chosen option:** A single Laravel event (`App\Events\AlertCreated`) fired when the Alert Engine creates a `critical` alert, with a listener (`App\Listeners\SendAlertNotification`) per channel:
+
+
 - **Desktop:** native OS notification via the `Native\Laravel\Facades\Notification` facade (guarded — no-op outside the Electron shell).
 - **Mobile:** **in-app alerts only.** The user declined the paid local-notifications plugin, so there are no OS-level push notifications on mobile. `critical` alerts surface in the dashboard critical banner and the alert log (already implemented). The listener detects the plugin's absence by class and skips mobile push gracefully, so nothing breaks — and buying the plugin later re-enables real push with zero architectural change.
 

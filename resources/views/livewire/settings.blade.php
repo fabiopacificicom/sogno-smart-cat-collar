@@ -8,7 +8,7 @@
     <!-- Tab Navigation -->
     <nav class="bg-white border border-gray-200 rounded-xl mb-6 overflow-x-auto">
         <div class="flex">
-            @foreach(['general' => 'General', 'providers' => 'Data Providers', 'thresholds' => 'Alert Thresholds', 'cats' => 'Cats', 'about' => 'About'] as $tab => $label)
+            @foreach(['general' => 'General', 'providers' => 'Data Providers', 'thresholds' => 'Alert Thresholds', 'cats' => 'Cats', 'devices' => 'Mobile Devices', 'about' => 'About'] as $tab => $label)
                 <button wire:click="switchTab('{{ $tab }}')" class="px-4 py-3 text-sm font-medium whitespace-nowrap {{ $activeTab === $tab ? 'text-orange-600 border-b-2 border-orange-500' : 'text-gray-500 hover:text-gray-700' }}">{{ $label }}</button>
             @endforeach
         </div>
@@ -214,6 +214,64 @@
                         </div>
                     @empty
                         <p class="text-sm text-gray-400 py-4 text-center">No cats yet. Add one above.</p>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Mobile Devices Tab -->
+    @if($activeTab === 'devices')
+        <div class="space-y-6">
+            <!-- Pairing -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 class="font-bold text-gray-800 mb-2">Pair a Phone</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    Generate a single-use code, then enter it in the mobile app
+                    (<em>Pair with desktop</em>) to link a phone. The code expires
+                    after {{ \App\Http\Controllers\Api\PairingController::CODE_TTL_MINUTES }} minutes.
+                    Make sure the phone is on the same WiFi as this computer.
+                </p>
+
+                @if($pairingCode)
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-6 text-center mb-4">
+                        <p class="text-xs text-gray-500 mb-1">Enter this code on your phone</p>
+                        <p class="text-4xl font-mono font-bold tracking-[0.3em] text-orange-600">{{ $pairingCode }}</p>
+                        <p class="text-xs text-gray-400 mt-2">Single-use · expires in {{ \App\Http\Controllers\Api\PairingController::CODE_TTL_MINUTES }} min</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-4">
+                        Desktop sync address: <span class="font-mono text-gray-700">{{ request()->getSchemeAndHttpHost() }}/api/mobile</span>
+                    </p>
+                @endif
+
+                <button wire:click="generatePairingCode" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-colors">
+                    {{ $pairingCode ? '↻ Generate New Code' : '+ Generate Pairing Code' }}
+                </button>
+            </div>
+
+            <!-- Paired devices -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6">
+                <h3 class="font-bold text-gray-800 mb-4">Paired Devices ({{ $devices->whereNull('revoked_at')->count() }})</h3>
+                <div class="space-y-2">
+                    @forelse($devices as $device)
+                        <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">{{ $device->isRevoked() ? '📵' : '📱' }}</span>
+                                <div>
+                                    <p class="font-medium text-gray-800">{{ $device->name }}</p>
+                                    <p class="text-xs text-gray-500">
+                                        Paired {{ $device->paired_at?->diffForHumans() ?? '—' }}
+                                        @if($device->last_seen_at) · Last seen {{ $device->last_seen_at->diffForHumans() }} @endif
+                                        @if($device->isRevoked()) · <span class="text-red-500">Revoked</span> @endif
+                                    </p>
+                                </div>
+                            </div>
+                            @unless($device->isRevoked())
+                                <button wire:click="revokeDevice({{ $device->id }})" wire:confirm="Revoke {{ $device->name }}? It will no longer sync." class="text-red-500 hover:text-red-700 text-sm">Revoke</button>
+                            @endunless
+                        </div>
+                    @empty
+                        <p class="text-sm text-gray-400 py-4 text-center">No devices paired yet. Generate a code above.</p>
                     @endforelse
                 </div>
             </div>
