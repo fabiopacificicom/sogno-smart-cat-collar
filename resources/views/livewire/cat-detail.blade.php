@@ -14,20 +14,20 @@
 
     @if($latest)
         <!-- Vitals Grid -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
-                <p class="text-xs text-gray-500 mb-1">🌡️ Temperature</p>
-                <p class="text-3xl font-bold {{ $latest->temperature > 39.5 ? 'text-red-500' : ($latest->temperature > 39.0 ? 'text-amber-500' : 'text-teal-500') }}">{{ $latest->temperature }}°C</p>
+        <div class="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
+            <div class="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 text-center">
+                <p class="text-xs text-gray-500 mb-1">🌡️ Temp</p>
+                <p class="text-xl sm:text-3xl font-bold {{ $latest->temperature > 39.5 ? 'text-red-500' : ($latest->temperature > 39.0 ? 'text-amber-500' : 'text-teal-500') }}">{{ $latest->temperature }}°C</p>
                 <p class="text-xs text-gray-400 mt-1">{{ $latest->read_at->diffForHumans() }}</p>
             </div>
-            <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
-                <p class="text-xs text-gray-500 mb-1">❤️ Heart Rate</p>
-                <p class="text-3xl font-bold {{ $latest->bpm > 250 ? 'text-red-500' : ($latest->bpm > 220 ? 'text-amber-500' : 'text-teal-500') }}">{{ $latest->bpm }}</p>
+            <div class="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 text-center">
+                <p class="text-xs text-gray-500 mb-1">❤️ Heart</p>
+                <p class="text-xl sm:text-3xl font-bold {{ $latest->bpm > 250 ? 'text-red-500' : ($latest->bpm > 220 ? 'text-amber-500' : 'text-teal-500') }}">{{ $latest->bpm }}</p>
                 <p class="text-xs text-gray-400 mt-1">bpm</p>
             </div>
-            <div class="bg-white rounded-xl border border-gray-200 p-5 text-center">
+            <div class="bg-white rounded-xl border border-gray-200 p-3 sm:p-5 text-center">
                 <p class="text-xs text-gray-500 mb-1">🏃 Activity</p>
-                <p class="text-3xl font-bold text-gray-800 capitalize">{{ $latest->activity }}</p>
+                <p class="text-xl sm:text-3xl font-bold text-gray-800 capitalize">{{ $latest->activity }}</p>
                 <p class="text-xs text-gray-400 mt-1">level</p>
             </div>
         </div>

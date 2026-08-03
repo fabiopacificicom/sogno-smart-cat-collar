@@ -293,39 +293,34 @@ User clicks → quitAndInstall()
 
 **Trade-off:** Mobile shows stale data when away from home or when the desktop is unreachable. Acceptable — the desktop is the always-on home monitoring station, and mobile keeps working offline with its last synced copy. Remote sync via tunnel is on the roadmap. Full design: `.specs/plans/feature-mobile-sync.md`.
 
-### 9. Notifications: shared alert event → desktop native; mobile uses in-app alerts (no paid plugin)
+### 9. Push notifications via shared alert event → local push on mobile
 
-**Alternative:** A remote push service (FCM/APNs from a server), or the paid `nativephp/mobile-local-notifications` plugin ($99) for OS-level local push on mobile.
+**Alternative:** A remote push service (FCM/APNs from a server) that wakes the mobile app when the desktop raises an alert.
 
-**Chosen option:** A single Laravel event (`App\Events\AlertCreated`) fired when the Alert Engine creates a `critical` alert, with a listener (`App\Listeners\SendAlertNotification`) per channel:
-
-
-- **Desktop:** native OS notification via the `Native\Laravel\Facades\Notification` facade (guarded — no-op outside the Electron shell).
-- **Mobile:** **in-app alerts only.** The user declined the paid local-notifications plugin, so there are no OS-level push notifications on mobile. `critical` alerts surface in the dashboard critical banner and the alert log (already implemented). The listener detects the plugin's absence by class and skips mobile push gracefully, so nothing breaks — and buying the plugin later re-enables real push with zero architectural change.
+**Chosen option:** A single Laravel event fired when the Alert Engine creates a `critical` alert, with listeners per channel. On mobile, alerts arrive via sync and are raised as **local** push notifications on-device. No server-side push infrastructure in v1.
 
 **Why:**
 
-- The Alert Engine previously only wrote DB records — there was no notification hook at all, so this event+listener layer is needed for desktop native notifications (Phase 2) anyway; mobile reuses the same foundation
+- The Alert Engine currently only writes DB records — there is no notification hook at all, so this layer is needed for desktop native notifications (Phase 2) anyway; mobile reuses the same foundation
 - No remote push server exists in this architecture (no cloud component) — remote FCM/APNs push would require one
-- The paid plugin is a per-project cost the user chose not to incur for a personal/student project; in-app alerts are sufficient for v1
-- Alert severities are `critical` and `warning` — only `critical` triggers the notification path; `warning` stays in-app. (There is no `emergency` severity; earlier planning notes mentioning it were aspirational.)
+- Local notifications on mobile work offline and match the sync-based design
+- Alert severities are `critical` and `warning` — only `critical` triggers push; `warning` stays in-app. (There is no `emergency` severity; earlier planning notes mentioning it were aspirational.)
 
-**Trade-off:** On mobile, the user must open the app to see a critical alert (no lock-screen/notification-shade push). Acceptable for v1 — the desktop hub still raises native notifications at home. If OS push on mobile becomes important, purchase the local-notifications plugin (or add FCM via the firebase plugin + a relay) — both are additive, no rework.
+**Trade-off:** If the desktop is off and the collar falls back to Telegram, the mobile app won't get alerts until it syncs. Mitigation path: a future Telegram/webhook listener on mobile, or a small cloud relay — both are post-v1 decisions.
 
-### 10. NativePHP Mobile v3 in the same repo, distinct app ID via config-swap
+### 10. NativePHP Mobile v3 in the same repo, distinct app ID
 
 **Alternative:** Separate repository for the mobile build.
 
-**Chosen option:** `composer require nativephp/mobile` (pinned `~3.0`, installed 3.3.6) in the existing repo, alongside `nativephp/electron`. Because **both packages publish the same `config/nativephp.php` (with different schemas) and both read `NATIVEPHP_APP_ID`**, we keep two per-platform source configs — `config/nativephp.desktop.php` and `config/nativephp.mobile.php` — and swap the active one with `php artisan native:use {desktop|mobile}` (a small custom command), which also sets the matching app ID (`com.pacificdev.smartcatcollar` for desktop, `com.pacificdev.smartcatcollar.mobile` for mobile). Run it before any `native:*` build/run command.
+**Chosen option:** `composer require nativephp/mobile` in the existing repo, alongside `nativephp/electron`. The mobile build uses a distinct app ID (e.g. `com.smartcatscollar.mobile`) from the desktop build.
 
 **Why:**
 
 - The single-codebase decision (#1) is the whole point — views, models, providers, and the alert engine are shared verbatim
-- `nativephp/mobile` and `nativephp/electron` coexist in one Laravel app without command collisions (`native:serve`/`native:build` vs. `native:run`/`native:package`) — verified
-- Distinct app IDs are required so desktop and mobile builds don't collide (stores, updaters, OS app registries); the config-swap is the cleanest way to give one shared config file two different schemas + IDs
-- On-device testing uses the free **Jump app** (`php artisan native:jump` + QR scan) — no APK build or emulator needed for day-to-day development
+- `nativephp/mobile` and `nativephp/electron` are separate Composer packages designed to coexist in one Laravel app
+- Distinct app IDs are required so desktop and mobile builds don't collide (stores, updaters, OS app registries)
 
-**Trade-off:** Build tooling for both platforms lives in one repo (Android SDK/Java 17 needed for mobile builds, Electron for desktop), and developers must remember to `native:use <target>` before building. The composer scripts (`native:mobile`, `native:mobile:install`) automate the swap to reduce that friction. Acceptable.
+**Trade-off:** Build tooling for both platforms lives in one repo (Android SDK/Java 17 needed for mobile builds, Electron for desktop). CI matrices get longer. Acceptable.
 
 ## Constraints
 
@@ -336,8 +331,8 @@ User clicks → quitAndInstall()
 - **Desktop = central data hub** — collar sends data to the desktop app's API, not the other way around
 - **Not Telegram-dependent** — Telegram is one configurable provider, not the architecture
 - **Mobile: no camera or biometrics** — the companion app only displays data
-- **Mobile: in-app alerts only (v1)** — `critical` alerts surface in the dashboard banner + alert log; **no OS push** (paid local-notifications plugin declined). Desktop still raises native notifications. No remote push server in v1
-- **Mobile: distinct app ID** from the desktop build (separate store/updater identity), via the config-swap mechanism
+- **Mobile: push notifications** for `critical` alerts (fever, severe lethargy) — local notifications driven by sync; no remote push server in v1
+- **Mobile: distinct app ID** from the desktop build (separate store/updater identity)
 - **Mobile sync is read-only and LAN-only** — settings, thresholds, and cat profiles are edited on the desktop only (v1); remote sync via tunnel is a roadmap item
 - **Multi-device pairing** — new `devices` table; multiple family members can each pair a phone, individually revocable
 - **Mobile build toolchain** — Android: Android SDK + Java 17 + signing keystore; iOS: macOS + Xcode + Apple Developer account (deferred)
@@ -383,13 +378,12 @@ User clicks → quitAndInstall()
 
 ### Phase 3 — Mobile Companion
 
-- [x] Notification foundation — `AlertCreated` event + `SendAlertNotification` listener (shared with Phase 2 desktop notifications)
-- [x] Mobile scaffold — `nativephp/mobile` 3.3.6 in same repo, config-swap (`native:use`), distinct app ID, `native:mobile` scripts
-- [x] Responsive verification — views adapted for 360–420px (vitals grid, nav touch targets ≥44px)
-- [x] On-device testing — via free Jump app (no paid plugin, no emulator needed); verified on a real phone
-- [x] In-app alerts for `critical` on mobile — no OS push (paid plugin declined); desktop keeps native notifications
+- [ ] Notification foundation — alert-created event + listener (shared with Phase 2 desktop notifications)
+- [ ] Mobile scaffold — `nativephp/mobile` in same repo, distinct app ID, `native:mobile` scripts
+- [ ] Responsive verification — all views at 360–420px widths, touch targets ≥44px
 - [ ] Mobile sync API — `devices` table, single-use pairing codes (multi-device), LAN-only read-only delta sync (cats, readings, alerts, thresholds). See `.specs/plans/feature-mobile-sync.md`
-- [ ] Android build — `.apk` deferred (local emulator/SDK broken; Jump covers testing). Fix SDK or use USB device
+- [ ] Local push notifications for `critical` alerts on mobile
+- [ ] Android build — `.apk` (debug + signed release)
 - [ ] iOS build — deferred (requires Mac + Apple Developer account)
 
 ### Phase 4 — Hardware Integration
@@ -404,37 +398,4 @@ User clicks → quitAndInstall()
 - [ ] GitHub Actions CI — build on tag push (Win + Linux + Mac)
 - [ ] Code signing (Windows OV cert, Apple Developer account)
 - [ ] Store submission (Microsoft Store, Google Play)
-
----
-
-## Roadmap — Future Features
-
-> Prioritized. Items move to Checklist when scheduled.
-
-| Priority | Feature | Description |
-| --- | --- | --- |
-| 🔴 High | MQTT provider | Collar communicates via MQTT broker — lower power than WiFi polling, industry standard for IoT |
-| 🔴 High | WebSocket provider | Real-time desktop ↔ mobile sync without polling |
-| 🔴 High | Tunnel-based remote sync | Expose the mobile sync API via tunnel (ngrok/Cloudflare Tunnel) so sync works away from home — token auth unchanged, only the base URL changes |
-| 🔴 High | Remote push relay | Small cloud component so mobile gets `critical` alerts when the desktop is unreachable — replaces sync-only local push |
-| 🟡 Medium | Mobile write-back | Edit thresholds/settings from mobile (requires conflict handling — sync API is read-only in v1) |
-| 🟡 Medium | Historical trend charts | 7-day and 30-day graphs for temp, bpm, activity — vet visit prep |
-| 🟡 Medium | Multi-cat comparison view | Side-by-side health comparison across cats |
-| 🟡 Medium | Export data (CSV/PDF) | Generate reports for vet visits — temp/bpm trends, alert history |
-| 🟡 Medium | Photo gallery | Collar camera captures stored and browsable in the app |
-| 🟢 Low | Voice alerts (olly-voice-server) | TTS announcements for critical alerts — "Cuscino has a fever" |
-| 🟢 Low | GPS tracking module | Add GPS module to collar → map view in app |
-| 🟢 Low | Multi-user accounts | Multiple households using the same app — auth, cloud sync |
-| 🟢 Low | AI health insights | Pattern detection across historical data — early warning before threshold breach |
-| 🟢 Low | Community sharing | Anonymized health data sharing for breed-specific baselines |
-
----
-
-## File paths
-
-- ADR: `repositories/smart-cats-collar/ADR.md`
-- Architecture diagram: `repositories/smart-cats-collar/architecture.mmd`
-- Architecture SVG: `repositories/smart-cats-collar/architecture.svg`
-- Hardware specs: `repositories/smart-cats-collar/docs/smart-collar-cat-project-specs.md`
-- Feature plans: `repositories/smart-cats-collar/.specs/plans/feature-*.md`
-- Checklist: `repositories/smart-cats-collar/CHECKLIST.md`
+</content>

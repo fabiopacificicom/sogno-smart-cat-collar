@@ -15,6 +15,7 @@
         "livewire/livewire": "^3.5",
         "nativephp/electron": "^1.0",
         "nativephp/laravel": "^1.0",
+        "nativephp/mobile": "~3.0",
         "symfony/contracts": "^3.7"
     },
     "require-dev": {
@@ -76,6 +77,14 @@
         "native:dev": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -k -c \"#93c5fd,#c4b5fd\" \"php artisan native:serve --no-interaction\" \"npm run dev\" --names=app,vite"
+        ],
+        "native:mobile": [
+            "@php artisan native:use mobile",
+            "@php artisan native:run android"
+        ],
+        "native:mobile:install": [
+            "@php artisan native:use mobile",
+            "@php artisan native:install android"
         ]
     },
     "extra": {
