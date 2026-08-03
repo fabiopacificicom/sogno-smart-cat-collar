@@ -20,9 +20,9 @@
                 </a>
                 <span class="text-xs text-gray-400">v1.0.0</span>
             </div>
-            <div class="flex items-center gap-4">
-                <a href="{{ route('dashboard') }}" class="text-xl hover:scale-110 transition-transform" title="Dashboard">📊</a>
-                <a href="{{ route('settings') }}" class="text-xl hover:scale-110 transition-transform" title="Settings">⚙️</a>
+            <div class="flex items-center gap-1">
+                <a href="{{ route('dashboard') }}" class="inline-flex items-center justify-center w-11 h-11 text-xl hover:scale-110 transition-transform" title="Dashboard">📊</a>
+                <a href="{{ route('settings') }}" class="inline-flex items-center justify-center w-11 h-11 text-xl hover:scale-110 transition-transform" title="Settings">⚙️</a>
             </div>
         </div>
     </header>
