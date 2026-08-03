@@ -19,12 +19,13 @@
 
 ## Phase 3 — Mobile Companion
 
-- [ ] Notification foundation — alert-created event + listener (shared with Phase 2 desktop notifications)
-- [ ] Mobile scaffold — `nativephp/mobile` in same repo, distinct app ID, `native:mobile` scripts
-- [ ] Responsive verification — all views at 360–420px widths, touch targets ≥44px
+- [x] Notification foundation — `AlertCreated` event + `SendAlertNotification` listener (shared with Phase 2 desktop notifications)
+- [x] Mobile scaffold — `nativephp/mobile` 3.3.6 in same repo, config-swap (`native:use`), distinct app ID, `native:mobile` scripts
+- [x] Responsive verification — views adapted for 360–420px widths, touch targets ≥44px
+- [x] On-device testing — via free Jump app (no paid plugin, no emulator); verified on a real phone
+- [x] In-app alerts for `critical` on mobile — no OS push (paid plugin declined)
 - [ ] Mobile sync API — `devices` table, single-use pairing codes (multi-device), LAN-only read-only delta sync (see `.specs/plans/feature-mobile-sync.md`)
-- [ ] Local push notifications for `critical` alerts on mobile
-- [ ] Android build — `.apk`; iOS deferred (Mac + Apple Developer account)
+- [ ] Android build — `.apk` deferred (local emulator/SDK broken; Jump covers testing); iOS deferred (Mac + Apple Developer account)
 
 ## Phase 4 — Hardware Integration
 

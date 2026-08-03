@@ -35,30 +35,38 @@ NativePHP Mobile v3 build of the same Laravel codebase — responsive Livewire v
 2. **Mobile scaffold:** `composer require nativephp/mobile`, then `php artisan native:mobile:install` (or per NativePHP Mobile v3 docs). Add `native:mobile` / `native:mobile:run` composer scripts. Use a distinct app ID (e.g. `com.smartcatscollar.app.mobile`) from the desktop build.
 3. **Responsive verification pass:** audit Dashboard, CatDetail, Settings, SetupWizard at 360×740 and 414×896; fix overflow, touch targets (min 44px), and font scaling. No layout rewrite expected.
 4. **Mobile navigation (optional v1):** keep top bar; add bottom tab bar only if audit shows reachability issues.
-5. **Push notifications:** register for push on first launch; map `critical` alerts to push via the listener from step 1. `warning` alerts stay in-app only. No `emergency` severity unless added to the Alert model + thresholds deliberately.
-6. **Offline-first:** NativePHP Mobile boots Laravel on-device with its own SQLite DB. Data exists locally without network. Sync of real collar data is covered by `feature-mobile-sync.md`.
-7. **Android build:** `php artisan native:mobile:build android` (or per docs) → `.apk`/`.aab`. Requires Android SDK, Java 17, and a signing keystore.
-8. **iOS build (future):** requires macOS + Xcode + Apple Developer account → `.ipa`. Out of scope for the first milestone.
+5. **Notifications — in-app alerts (decision changed 2026-08-03):** user declined the paid `nativephp/mobile-local-notifications` plugin ($99). So there are **no OS-level push notifications** — alerts surface **in-app** (dashboard critical banner + alert log, already implemented). The `SendAlertNotification` listener detects the plugin's absence and skips mobile push gracefully, so no code path breaks. A future purchase of the plugin re-enables real push with no architectural change.
+6. **Offline-first:** NativePHP Mobile boots Laravel on-device with its own SQLite DB (auto-created, migrations auto-run on boot). Data exists locally without network. Sync of real collar data is covered by `feature-mobile-sync.md`.
+7. **On-device testing (Jump):** `php artisan native:jump` + the free Jump app on the phone (same WiFi) — no build needed, hot reload works. Verified working 2026-08-03.
+8. **Android build (deferred):** `.apk` via `php artisan native:run android` (needs a working emulator or USB device) or `native:package android` (signed). **Blocked:** the local AVDs are corrupt and `cmdline-tools` is missing, so the emulator path fails. Defer until the SDK is repaired or a physical device is available. Not required for the first milestone (Jump covers on-device testing).
+9. **iOS build (future):** requires macOS + Xcode + Apple Developer account → `.ipa`. Out of scope.
 
 ## Expected output
-- NativePHP Mobile scaffold in the same repo (`composer require nativephp/mobile`)
-- Alert-created event + notification listener (shared with desktop notifications)
-- Same Dashboard and Settings views verified responsive on 360-420px screens
-- Push notification registration + delivery for `critical` alerts
-- SQLite on-device — app opens and shows local data without network
-- `.apk` (debug and/or release-signed) for Android
-- `.ipa` for iOS deferred (requires Mac + Apple Developer account)
-- Distinct mobile app ID in `config/nativephp.php` / env
+- ✅ NativePHP Mobile scaffold in the same repo (`nativephp/mobile` 3.3.6)
+- ✅ Alert-created event + notification listener (shared with desktop notifications)
+- ✅ Same Dashboard and Settings views verified responsive on 360-420px screens
+- ✅ In-app alert display for `critical` alerts (no OS push — paid plugin declined)
+- ✅ SQLite on-device — app opens and shows local data without network
+- ✅ On-device testing via Jump app (verified on a real phone)
+- ✅ Distinct mobile app ID via config-swap (`native:use mobile` → `com.pacificdev.smartcatcollar.mobile`)
+- ⏸️ `.apk` for Android — deferred (broken local SDK/emulator; Jump covers testing)
+- ⏸️ `.ipa` for iOS — deferred (requires Mac + Apple Developer account)
 
-## Open questions
-- App ID strategy: single `NATIVEPHP_APP_ID` today — decide per-platform env values (proposal: `com.smartcatscollar.desktop` / `com.smartcatscollar.mobile`).
-- iOS timeline: blocked on Apple Developer account + Mac access.
+## Implementation notes (how it was built)
+- **Config-swap:** both Electron and Mobile share `config/nativephp.php` (different schemas) + `NATIVEPHP_APP_ID`. Solved with two source configs — `config/nativephp.desktop.php` and `config/nativephp.mobile.php` — plus `php artisan native:use {desktop|mobile}` ([app/Console/Commands/NativeUse.php](../../app/Console/Commands/NativeUse.php)) which copies the right config into place and sets the matching `NATIVEPHP_APP_ID`. Run it before any `native:*` command.
+- **Composer scripts:** `composer native:mobile` (swap + `native:run android`), `composer native:mobile:install` (swap + `native:install android`).
+- **Coexistence verified:** `native:serve`/`native:build` (Electron) and `native:run`/`native:package` (Mobile) do not collide.
+- **Scaffold:** `php artisan native:install android` produces `nativephp/android` (Gradle/Kotlin project, self-ignored via `nativephp/.gitignore`).
 
 ## Decisions (confirmed with user 2026-08-03)
 - ✅ First mobile milestone runs its own local SQLite (MockDataProvider for demos); pairing + LAN sync lands with `feature-mobile-sync.md`
 - ✅ LAN-only sync for v1; tunnel-based remote sync goes on the roadmap
 - ✅ New `devices` table — multiple family members can each pair a phone
 - ✅ Single-use pairing codes
+- ✅ **No purchased plugins** — rely on in-app alert display, no OS push notifications
+- ✅ **Test on-device via Jump app**, not the emulator (local emulator/SDK is broken)
+- ⏸️ App ID values: using `com.pacificdev.smartcatcollar` (desktop) / `com.pacificdev.smartcatcollar.mobile` (mobile)
+- ⏸️ iOS timeline: blocked on Apple Developer account + Mac access
 
 ## Status
-[ ] Not started
+[x] In progress — core mobile milestone complete (scaffold, responsive, notifications foundation, Jump on-device testing verified 2026-08-03). Remaining: mobile sync (`feature-mobile-sync.md`), Android APK build (deferred — SDK repair), iOS (deferred).
