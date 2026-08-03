@@ -1,15 +1,12 @@
-name: Build & Release
+name: Build Desktop App
 
 on:
   push:
     tags:
       - 'v*'
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: write
-  checks: write
 
 jobs:
   build:
@@ -75,8 +72,8 @@ jobs:
           NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
           NATIVEPHP_APP_ID: com.smartcatcollar.desktop
           NATIVEPHP_APP_AUTHOR: pacificDev
-          NATIVEPHP_APP_COPYRIGHT: "┬⌐ ${{ github.ref_name }} pacificDev"
-          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar ΓÇö Desktop Companion App"
+          NATIVEPHP_APP_COPYRIGHT: "© ${{ github.ref_name }} pacificDev"
+          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar — Desktop Companion App"
           NATIVEPHP_APP_WEBSITE: "https://github.com/${{ github.repository }}"
           APP_NAME: "Smart Cat Collar"
           APP_URL: "http://localhost"
@@ -121,131 +118,8 @@ jobs:
             dist/RELEASES
           if-no-files-found: warn
 
-  # ── Build Mobile Android (tagged releases) ──
-  mobile-android:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo
-          tools: composer:v2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install PHP deps
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Install NPM deps and build
-        run: |
-          npm ci
-          npm run build
-
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-          echo "NATIVEPHP_APP_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> .env
-          echo "NATIVEPHP_APP_VERSION_CODE=1" >> .env
-
-      - name: Activate mobile config
-        run: php artisan native:use mobile
-
-      - name: Install NativePHP Mobile
-        run: php artisan native:install --force --no-interaction
-
-      - name: Fix Android placeholders
-        run: |
-          GRADLE_FILE="nativephp/android/app/build.gradle.kts"
-          sed -i 's/REPLACE_COMPILE_SDK/36/g' "$GRADLE_FILE"
-          sed -i 's/REPLACE_MIN_SDK/24/g' "$GRADLE_FILE"
-          sed -i 's/REPLACE_TARGET_SDK/36/g' "$GRADLE_FILE"
-          sed -i 's/REPLACE_APP_ID/com.pacificdev.smartcatcollar.mobile/g' "$GRADLE_FILE"
-          sed -i 's/REPLACEMECODE/1/g' "$GRADLE_FILE"
-          APP_VER=$(echo ${{ github.ref_name }} | sed 's/^v//')
-          sed -i "s/REPLACEME/${APP_VER}/g" "$GRADLE_FILE"
-          sed -i 's/REPLACE_MINIFY_ENABLED/false/g' "$GRADLE_FILE"
-          sed -i 's/REPLACE_SHRINK_RESOURCES/false/g' "$GRADLE_FILE"
-          sed -i 's/REPLACE_DEBUG_SYMBOLS/none/g' "$GRADLE_FILE"
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > nativephp/android/local.properties
-          MANIFEST="nativephp/android/app/src/main/AndroidManifest.xml"
-          sed -i 's/android:label="NativePHP"/android:label="Smart Cat Collar"/g' "$MANIFEST"
-          sed -i 's/package="[^"]*"/package="com.pacificdev.smartcatcollar.mobile"/g' "$MANIFEST"
-          echo "Placeholders replaced"
-
-      - name: Bundle Laravel app into Android assets
-        run: |
-          ASSETS_DIR="nativephp/android/app/src/main/assets"
-          BUNDLE_ZIP="${ASSETS_DIR}/laravel_bundle.zip"
-          STAGING="nativephp/android/laravel_staging"
-          mkdir -p "${ASSETS_DIR}" "${STAGING}"
-
-          rsync -a --delete \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='nativephp' \
-            --exclude='*.zip' \
-            --exclude='*.jks' \
-            . "${STAGING}/"
-
-          composer install --no-dev --no-interaction --prefer-dist \
-            --optimize-autoloader --no-scripts \
-            --working-dir="${STAGING}"
-          composer dump-autoload --optimize --classmap-authoritative --no-scripts \
-            --working-dir="${STAGING}"
-
-          cp vendor/nativephp/mobile/bootstrap/android/artisan.php "${STAGING}/artisan.php"
-          cp .env "${STAGING}/.env"
-
-          mkdir -p "${STAGING}/bootstrap/cache"
-          mkdir -p "${STAGING}/storage/framework/cache"
-          mkdir -p "${STAGING}/storage/framework/sessions"
-          mkdir -p "${STAGING}/storage/framework/views"
-
-          rm -f "${STAGING}/bootstrap/cache/packages.php"
-          rm -f "${STAGING}/bootstrap/cache/services.php"
-
-          BUNDLE_ZIP_ABS="${GITHUB_WORKSPACE}/${BUNDLE_ZIP}"
-          cd "${STAGING}" && zip -r "${BUNDLE_ZIP_ABS}" . && cd -
-
-          echo "Bundle size: $(du -sh ${BUNDLE_ZIP_ABS} | cut -f1)"
-          ls -lh "${BUNDLE_ZIP_ABS}"
-
-      - name: Build Android APK
-        run: |
-          cd nativephp/android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
-
-      - name: Find APK
-        id: find_apk
-        run: |
-          APK_PATH=$(find nativephp/android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-          echo "Found APK: $APK_PATH"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: smart-cat-collar-android
-          path: ${{ steps.find_apk.outputs.apk_path }}
-
   release:
-    needs: [build, mobile-android]
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -268,7 +142,7 @@ jobs:
           body: |
             ## Smart Cat Collar ${{ github.ref_name }}
 
-            Desktop Companion App + Mobile Companion App.
+            Desktop Companion App for Smart Cat Collar.
 
             ### Downloads
 
@@ -277,14 +151,12 @@ jobs:
             | Windows  | `Smart Cat Collar-*.exe` |
             | macOS    | `Smart Cat Collar-*.dmg` |
             | Linux    | `Smart Cat Collar-*.AppImage` |
-            | Android  | `app-debug.apk` |
 
             ### Installation
 
             - **Windows**: Run the `.exe` installer.
             - **macOS**: Open the `.dmg` and drag to Applications.
             - **Linux**: Make the `.AppImage` executable (`chmod +x`) and run.
-            - **Android**: Install the `.apk` on your device (enable "Install from unknown sources").
 
             ### Changelog
 

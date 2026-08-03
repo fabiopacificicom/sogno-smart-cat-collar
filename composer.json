@@ -15,7 +15,6 @@
         "livewire/livewire": "^3.5",
         "nativephp/electron": "^1.0",
         "nativephp/laravel": "^1.0",
-        "nativephp/mobile": "~3.0",
         "symfony/contracts": "^3.7"
     },
     "require-dev": {

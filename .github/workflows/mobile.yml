@@ -1,0 +1,159 @@
+name: Build Mobile App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, gd, bcmath, sqlite3, zip, fileinfo
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_PROCESS_TIMEOUT: 1800
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Add NativePHP Mobile
+        env:
+          COMPOSER_PROCESS_TIMEOUT: 1800
+        run: composer require nativephp/mobile:~3.0 --no-interaction --no-progress
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets (Vite)
+        run: npm run build
+
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "NATIVEPHP_APP_VERSION=$VERSION" >> .env
+          echo "NATIVEPHP_APP_VERSION_CODE=1" >> .env
+          echo "NATIVEPHP_APP_ID=com.pacificdev.smartcatcollar.mobile" >> .env
+
+      - name: Activate mobile NativePHP config
+        run: php artisan native:use mobile --no-interaction
+
+      - name: Install NativePHP Mobile scaffold
+        run: php artisan native:install android --force --no-interaction --skip-php
+
+      - name: Fix Android placeholders
+        run: |
+          GRADLE_FILE="nativephp/android/app/build.gradle.kts"
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          sed -i 's/REPLACE_COMPILE_SDK/36/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_MIN_SDK/24/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_TARGET_SDK/36/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_APP_ID/com.pacificdev.smartcatcollar.mobile/g' "$GRADLE_FILE"
+          sed -i 's/REPLACEMECODE/1/g' "$GRADLE_FILE"
+          sed -i "s/REPLACEME/${VERSION}/g" "$GRADLE_FILE"
+          sed -i 's/REPLACE_MINIFY_ENABLED/false/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_SHRINK_RESOURCES/false/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_DEBUG_SYMBOLS/none/g' "$GRADLE_FILE"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > nativephp/android/local.properties
+          MANIFEST="nativephp/android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="NativePHP"/android:label="Smart Cat Collar"/g' "$MANIFEST"
+          sed -i 's/package="[^"]*"/package="com.pacificdev.smartcatcollar.mobile"/g' "$MANIFEST"
+
+      - name: Bundle Laravel app into Android assets
+        run: |
+          ASSETS_DIR="nativephp/android/app/src/main/assets"
+          BUNDLE_ZIP="${ASSETS_DIR}/laravel_bundle.zip"
+          STAGING="nativephp/android/laravel_staging"
+          mkdir -p "${ASSETS_DIR}" "${STAGING}"
+
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='nativephp' \
+            --exclude='*.zip' \
+            --exclude='*.jks' \
+            . "${STAGING}/"
+
+          composer install --no-dev --no-interaction --prefer-dist \
+            --optimize-autoloader --no-scripts \
+            --working-dir="${STAGING}"
+          composer dump-autoload --optimize --classmap-authoritative --no-scripts \
+            --working-dir="${STAGING}"
+
+          cp vendor/nativephp/mobile/bootstrap/android/artisan.php "${STAGING}/artisan.php"
+          cp .env "${STAGING}/.env"
+
+          mkdir -p "${STAGING}/bootstrap/cache"
+          mkdir -p "${STAGING}/storage/framework/cache"
+          mkdir -p "${STAGING}/storage/framework/sessions"
+          mkdir -p "${STAGING}/storage/framework/views"
+
+          rm -f "${STAGING}/bootstrap/cache/packages.php"
+          rm -f "${STAGING}/bootstrap/cache/services.php"
+
+          BUNDLE_ZIP_ABS="${GITHUB_WORKSPACE}/${BUNDLE_ZIP}"
+          (cd "${STAGING}" && zip -qr "${BUNDLE_ZIP_ABS}" .)
+
+          echo "Bundle size: $(du -sh "${BUNDLE_ZIP_ABS}" | cut -f1)"
+
+      - name: Build Android APK
+        run: |
+          cd nativephp/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find nativephp/android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          cp "$APK_PATH" "smart-cat-collar-${{ github.ref_name }}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-cat-collar-android-${{ github.ref_name }}
+          path: smart-cat-collar-${{ github.ref_name }}.apk
+
+      - name: Attach APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          FILE="smart-cat-collar-${TAG}.apk"
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$TAG" "$FILE" --repo "${{ github.repository }}" \
+              --title "Release $TAG" --notes "Android build for $TAG" --draft=false --prerelease=false
+          fi
