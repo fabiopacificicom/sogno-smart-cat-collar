@@ -51,9 +51,14 @@ NativePHP Mobile v3 build of the same Laravel codebase — responsive Livewire v
 - Distinct mobile app ID in `config/nativephp.php` / env
 
 ## Open questions
-- Mobile data source: until `feature-mobile-sync.md` lands, the mobile app runs on its own local SQLite (MockDataProvider for demos). Confirm this is acceptable for the first mobile milestone.
-- App ID strategy: single `NATIVEPHP_APP_ID` today — decide per-platform env values.
+- App ID strategy: single `NATIVEPHP_APP_ID` today — decide per-platform env values (proposal: `com.smartcatscollar.desktop` / `com.smartcatscollar.mobile`).
 - iOS timeline: blocked on Apple Developer account + Mac access.
+
+## Decisions (confirmed with user 2026-08-03)
+- ✅ First mobile milestone runs its own local SQLite (MockDataProvider for demos); pairing + LAN sync lands with `feature-mobile-sync.md`
+- ✅ LAN-only sync for v1; tunnel-based remote sync goes on the roadmap
+- ✅ New `devices` table — multiple family members can each pair a phone
+- ✅ Single-use pairing codes
 
 ## Status
 [ ] Not started

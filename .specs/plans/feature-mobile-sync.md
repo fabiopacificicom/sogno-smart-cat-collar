@@ -18,11 +18,13 @@ Define and implement how the mobile companion app receives collar data, alerts, 
 - ADR architecture diagram shows `DB --> Mobile` / `Data API ──► mobile sync` but no design existed — this plan fills that gap.
 - Offline-first constraint: mobile must keep working with its last-synced local SQLite copy when the desktop is unreachable.
 
-## Design decisions to make (before coding)
-1. **Topology:** mobile pulls from desktop over LAN (mDNS/manual host entry) or via the same tunnel used by the collar (ngrok/Cloudflare Tunnel). LAN-first is simpler and offline-friendly at home; tunnel enables remote access.
-2. **Auth:** per-device pairing. Proposal: desktop Settings page shows a one-time pairing code + QR; mobile enters it and receives a long-lived API token stored on-device. Token identifies the device in `provider_settings` or a new `devices` table.
-3. **Direction:** v1 is read-only sync (desktop → mobile). Mobile does not write sensor data. Settings/threshold changes remain desktop-only in v1.
-4. **Mechanism:** polling for v1 (e.g. mobile fetches deltas on launch + every N minutes while open). WebSocket push is a roadmap item.
+## Design decisions (confirmed with user 2026-08-03)
+1. **Topology:** LAN-only for v1. Mobile pulls from the desktop over the local network (mDNS/manual host entry). Tunnel-based remote sync is a roadmap item — the sync API design must not preclude it (token auth works the same over a tunnel; only reachability changes).
+2. **Auth:** per-device pairing. Desktop Settings shows a **single-use** pairing code (short TTL, e.g. 10 minutes) + optional QR; mobile enters it once and receives a long-lived API token stored on-device. Revoking a device deletes its token.
+3. **Devices table:** new `devices` table (NOT `provider_settings`) — the user may pair **multiple mobile devices** (e.g. each family member monitors the cats). Each device gets its own token, name, and revocation control.
+4. **Direction:** v1 is read-only sync (desktop → mobile). Mobile does not write sensor data. Settings/threshold changes remain desktop-only in v1.
+5. **Mechanism:** polling for v1 — mobile fetches deltas on launch + pull-to-refresh + timed polling (every N minutes while the app is open). WebSocket push is a roadmap item (ADR).
+6. **First milestone without sync:** acceptable — mobile runs its own local SQLite (MockDataProvider for demos) until this feature lands.
 
 ## Proposed API surface (v1, read-only)
 | Endpoint | Purpose |
@@ -35,27 +37,37 @@ Define and implement how the mobile companion app receives collar data, alerts, 
 
 All except `/pair` require the device token (Authorization header).
 
+### Devices table (migration sketch)
+| Column | Notes |
+|---|---|
+| `id` | PK |
+| `name` | Device label, e.g. "Fabio's Pixel" — editable in Settings |
+| `token_hash` | Hashed API token (never store plaintext) |
+| `paired_at` | Timestamp of successful pairing |
+| `last_seen_at` | Updated on each authenticated sync request |
+| `revoked_at` | Nullable — soft revocation, keeps audit trail |
+
+Multiple rows supported — one per family member's phone.
+
 ## Implementation steps
-1. Decide topology + auth (answer Open questions with user).
-2. Add `devices` migration (id, name, token hash, paired_at, last_seen_at) — or reuse `provider_settings` if simpler.
-3. Add pairing UI to desktop Settings (new "Mobile Devices" tab): generate/revoke pairing codes, list paired devices.
-4. Add API controllers + token middleware for the endpoints above.
-5. Mobile side: pairing screen (enter code), token storage, sync service that pulls deltas into the mobile-local SQLite via the existing models.
-6. Alert fan-out: the alert listener (from `feature-mobile-app.md` step 1) records alerts; mobile picks them up via `/alerts` delta and raises local push notifications for `critical`.
-7. Conflict handling: none needed in v1 (read-only). Document that writes are desktop-only.
+1. Add `devices` migration + `Device` model (columns above).
+2. Add pairing UI to desktop Settings (new "Mobile Devices" tab): generate single-use pairing code (10-min TTL), list paired devices, rename, revoke.
+3. Add API controllers + token middleware for the endpoints above. `POST /api/mobile/pair` validates the code (single-use, TTL), creates the Device row, returns the plaintext token once.
+4. Mobile side: pairing screen (enter code), secure token storage, sync service that pulls deltas into the mobile-local SQLite via the existing models (upsert by `id`, track `last_synced_at` per device).
+5. Alert fan-out: the alert listener (from `feature-mobile-app.md` step 1) records alerts; mobile picks them up via `/alerts` delta and raises local push notifications for `critical`.
+6. Conflict handling: none needed in v1 (read-only). Document that writes are desktop-only.
 
 ## Expected output
-- Pairing flow: desktop shows code/QR → mobile pairs → token stored
+- Pairing flow: desktop shows single-use code/QR → mobile pairs → token stored on-device
+- Multiple devices can pair; each appears in desktop Settings and can be revoked individually
 - Mobile app displays the same cats, readings, and alerts as the desktop (delta-synced)
-- Works on LAN without internet; works via tunnel when remote
+- Works on LAN without internet
 - Mobile keeps functioning offline with last synced data
-- Device revocation from desktop Settings
 
-## Open questions
-- LAN-only v1, or tunnel-based remote access from day one? (Tunnel is already a project pattern for the collar.)
-- Pairing code TTL and single-use vs. reusable?
-- Do we need a `devices` table, or is a ProviderSetting entry enough for a single-user app?
-- Sync cadence: on-launch + manual pull-to-refresh, or timed polling?
+## Roadmap (post-v1)
+- **Tunnel-based remote sync** — reuse the collar's tunnel pattern (ngrok/Cloudflare Tunnel) so sync works away from home. Token auth is unchanged; only the base URL becomes the tunnel URL. Add a "Remote access" toggle + tunnel URL field in desktop Settings.
+- **WebSocket provider** — real-time push instead of polling (already in ADR roadmap).
+- **Mobile write-back** — edit thresholds/settings from mobile (requires conflict handling).
 
 ## Status
 [ ] Not started

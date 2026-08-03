@@ -260,20 +260,20 @@ User clicks → quitAndInstall()
 
 **Trade-off:** Less "native" feel than React on mobile. Acceptable — the NativePHP Mobile v3 EDGE components can supplement for key interactions.
 
-### 8. Mobile data sync: read-only sync API from the desktop hub (not direct DB access)
+### 8. Mobile data sync: read-only sync API from the desktop hub, LAN-only v1 (not direct DB access)
 
 **Alternative:** Mobile app polls Telegram Bot API independently, or ships with no sync and only shows its own mock data.
 
-**Chosen option:** The desktop app exposes a read-only mobile sync API. Mobile pairs with the desktop (one-time pairing code → long-lived device token), then pulls delta syncs (cats, readings, alerts, thresholds) into its own on-device SQLite.
+**Chosen option:** The desktop app exposes a read-only mobile sync API, reachable on the **LAN only** in v1. Mobile pairs with the desktop (**single-use pairing code**, short TTL → long-lived device token per device), then pulls delta syncs (cats, readings, alerts, thresholds) into its own on-device SQLite. A new `devices` table tracks paired phones — **multiple devices supported** (each family member can monitor the cats), each individually revocable from desktop Settings. Tunnel-based remote sync is deferred to the roadmap.
 
 **Why:**
 - The ADR already establishes the desktop as the central data hub — the mobile app should be a *client of the hub*, not a second independent data receiver
 - Each platform has its own SQLite database (offline-first constraint) — there is no shared database file to read; a sync API is the only consistent option
 - Read-only v1 keeps conflict handling out of scope — settings and thresholds are edited on the desktop only
-- Pairing codes avoid user accounts (single-user personal app) while still letting the desktop revoke devices
-- Works on LAN without internet; tunnel extends it to remote access using a pattern the project already has
+- Pairing codes avoid user accounts while still letting the desktop manage and revoke each family member's device
+- LAN-only v1 is simpler and covers the primary use case (monitoring at home); token auth is tunnel-compatible, so remote sync later requires no redesign
 
-**Trade-off:** Mobile shows stale data when the desktop is unreachable. Acceptable — the desktop is the always-on home monitoring station, and mobile keeps working offline with its last synced copy. Full design: `.specs/plans/feature-mobile-sync.md`.
+**Trade-off:** Mobile shows stale data when away from home or when the desktop is unreachable. Acceptable — the desktop is the always-on home monitoring station, and mobile keeps working offline with its last synced copy. Remote sync via tunnel is on the roadmap. Full design: `.specs/plans/feature-mobile-sync.md`.
 
 ### 9. Push notifications via shared alert event → local push on mobile
 
@@ -313,7 +313,8 @@ User clicks → quitAndInstall()
 - **Mobile: no camera or biometrics** — the companion app only displays data
 - **Mobile: push notifications** for `critical` alerts (fever, severe lethargy) — local notifications driven by sync; no remote push server in v1
 - **Mobile: distinct app ID** from the desktop build (separate store/updater identity)
-- **Mobile sync is read-only** — settings, thresholds, and cat profiles are edited on the desktop only (v1)
+- **Mobile sync is read-only and LAN-only** — settings, thresholds, and cat profiles are edited on the desktop only (v1); remote sync via tunnel is a roadmap item
+- **Multi-device pairing** — new `devices` table; multiple family members can each pair a phone, individually revocable
 - **Mobile build toolchain** — Android: Android SDK + Java 17 + signing keystore; iOS: macOS + Xcode + Apple Developer account (deferred)
 - **Mock data until hardware is ready** — `MockDataProvider` class
 - **Responsive design** — same Blade/Livewire views adapt to desktop window (800×600) and mobile screen
@@ -329,7 +330,8 @@ User clicks → quitAndInstall()
 - **GPS tracking** — not in first release (LIS3DH is onboard, GPS is not)
 - **Web app version** — this project is desktop + mobile native apps
 - **Store publishing** — future phase, after hardware validation
-- **Multi-user / accounts** — single user, personal monitoring (your cats)
+- **Multi-user / accounts** — no logins or cloud accounts; multiple mobile devices pair with the desktop via codes (family members), but there is one household, one desktop hub
+- **Remote mobile sync** — v1 sync is LAN-only; tunnel-based remote access is on the roadmap
 - **Real-time video stream** — camera captures are still photos, not a live feed
 - **Custom tunnel service** — we use existing tools (ngrok, Cloudflare Tunnel) for now
 
@@ -356,7 +358,7 @@ User clicks → quitAndInstall()
 - [ ] Notification foundation — alert-created event + listener (shared with Phase 2 desktop notifications)
 - [ ] Mobile scaffold — `nativephp/mobile` in same repo, distinct app ID, `native:mobile` scripts
 - [ ] Responsive verification — all views at 360–420px widths, touch targets ≥44px
-- [ ] Mobile sync API — pairing (one-time code → device token), read-only delta sync (cats, readings, alerts, thresholds). See `.specs/plans/feature-mobile-sync.md`
+- [ ] Mobile sync API — `devices` table, single-use pairing codes (multi-device), LAN-only read-only delta sync (cats, readings, alerts, thresholds). See `.specs/plans/feature-mobile-sync.md`
 - [ ] Local push notifications for `critical` alerts on mobile
 - [ ] Android build — `.apk` (debug + signed release)
 - [ ] iOS build — deferred (requires Mac + Apple Developer account)
@@ -382,9 +384,10 @@ User clicks → quitAndInstall()
 |---|---|---|
 | 🔴 High | MQTT provider | Collar communicates via MQTT broker — lower power than WiFi polling, industry standard for IoT |
 | 🔴 High | WebSocket provider | Real-time desktop ↔ mobile sync without polling |
-| � High | Remote push relay | Small cloud component so mobile gets `critical` alerts when the desktop is unreachable — replaces sync-only local push |
+| 🔴 High | Tunnel-based remote sync | Expose the mobile sync API via tunnel (ngrok/Cloudflare Tunnel) so sync works away from home — token auth unchanged, only the base URL changes |
+| 🔴 High | Remote push relay | Small cloud component so mobile gets `critical` alerts when the desktop is unreachable — replaces sync-only local push |
 | 🟡 Medium | Mobile write-back | Edit thresholds/settings from mobile (requires conflict handling — sync API is read-only in v1) |
-| �🟡 Medium | Historical trend charts | 7-day and 30-day graphs for temp, bpm, activity — vet visit prep |
+| 🟡 Medium | Historical trend charts | 7-day and 30-day graphs for temp, bpm, activity — vet visit prep |
 | 🟡 Medium | Multi-cat comparison view | Side-by-side health comparison across cats |
 | 🟡 Medium | Export data (CSV/PDF) | Generate reports for vet visits — temp/bpm trends, alert history |
 | 🟡 Medium | Photo gallery | Collar camera captures stored and browsable in the app |
