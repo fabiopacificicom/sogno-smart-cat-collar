@@ -73,10 +73,10 @@ jobs:
       - name: Build desktop app (${{ matrix.os }})
         env:
           NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
-          NATIVEPHP_APP_ID: com.smartcatcollar.desktop
+          NATIVEPHP_APP_ID: com.pacificdev.smartcatcollar
           NATIVEPHP_APP_AUTHOR: pacificDev
-          NATIVEPHP_APP_COPYRIGHT: "┬⌐ ${{ github.ref_name }} pacificDev"
-          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar ΓÇö Desktop Companion App"
+          NATIVEPHP_APP_COPYRIGHT: "© ${{ github.ref_name }} pacificDev"
+          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar — Desktop Companion App"
           NATIVEPHP_APP_WEBSITE: "https://github.com/${{ github.repository }}"
           APP_NAME: "Smart Cat Collar"
           APP_URL: "http://localhost"
