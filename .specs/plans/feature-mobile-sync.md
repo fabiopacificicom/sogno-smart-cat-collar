@@ -69,5 +69,22 @@ Multiple rows supported — one per family member's phone.
 - **WebSocket provider** — real-time push instead of polling (already in ADR roadmap).
 - **Mobile write-back** — edit thresholds/settings from mobile (requires conflict handling).
 
+## Implementation notes (built 2026-08-03)
+
+**Desktop hub side:**
+- `devices` migration + `App\Models\Device` (token stored as SHA-256 hash; `paired_at`/`last_seen_at`/`revoked_at`; multi-device).
+- `App\Http\Controllers\Api\PairingController` — `POST /api/mobile/pair`: validates a single-use 6-digit code (10-min TTL, stored hashed in `app_settings`), consumes it, issues a long-lived token (plaintext returned once).
+- `App\Http\Controllers\Api\MobileSyncController` — `GET /api/mobile/{cats,readings,alerts,thresholds}` with `?since=<ISO8601>` delta cursors (readings/alerts use `created_at`, cats/thresholds use `updated_at`).
+- `App\Http\Controllers\Api\MobileApiController` — base with bearer-token auth + `last_seen_at` stamping; 401 on missing/invalid/revoked token.
+- Settings → **Mobile Devices** tab: generate pairing code, list paired devices, revoke individually.
+- Verified via tinker: pair/token/single-use/no-auth/revoked all behave correctly.
+
+**Mobile client side (same codebase, `System::isMobile()` runtime):**
+- `App\Services\MobileSyncService` — `isMobileRuntime()` detection, `pair()` (normalizes host, POSTs code, stores token), `syncAll()` (per-resource delta upsert with `mobile_sync_since_*` cursors in `app_settings`). Token stored in SecureStorage when native, mirrored to `app_settings` for Jump/browser testing.
+- `App\Livewire\PairDevice` + view — enter desktop address + 6-digit code, then redirect to dashboard.
+- Route wiring: on mobile runtime with no pairing, `/` redirects to `/pair`.
+
+**Design deviation from the plan:** pairing code is a 6-digit numeric code (not QR) for v1 — simpler to build and test; QR can wrap the same payload later. SecureStorage uses an `app_settings` fallback so pairing works when testing via the Jump app in a plain browser (no native bridge).
+
 ## Status
-[ ] Not started
+[x] Implemented 2026-08-03 (desktop hub + phone client). End-to-end pairing + sync verified on desktop; on-device pairing via Jump pending a quick phone-side confirmation.

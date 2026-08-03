@@ -24,7 +24,7 @@
 - [x] Responsive verification — views adapted for 360–420px widths, touch targets ≥44px
 - [x] On-device testing — via free Jump app (no paid plugin, no emulator); verified on a real phone
 - [x] In-app alerts for `critical` on mobile — no OS push (paid plugin declined)
-- [ ] Mobile sync API — `devices` table, single-use pairing codes (multi-device), LAN-only read-only delta sync (see `.specs/plans/feature-mobile-sync.md`)
+- [x] Mobile sync API — `devices` table, single-use pairing codes (multi-device), LAN-only read-only delta sync (desktop hub + phone client; see `.specs/plans/feature-mobile-sync.md`)
 - [ ] Android build — `.apk` deferred (local emulator/SDK broken; Jump covers testing); iOS deferred (Mac + Apple Developer account)
 
 ## Phase 4 — Hardware Integration
