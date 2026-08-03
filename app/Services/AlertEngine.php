@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\AlertCreated;
 use App\Models\Alert;
 use App\Models\Cat;
 use App\Models\SensorReading;
@@ -81,7 +82,7 @@ class AlertEngine
         float $threshold,
         string $message,
     ): Alert {
-        return Alert::create([
+        $alert = Alert::create([
             'cat_id' => $cat->id,
             'type' => $type,
             'vital' => $vital,
@@ -89,5 +90,10 @@ class AlertEngine
             'threshold' => $threshold,
             'message' => $message,
         ]);
+
+        // Fire the event so listeners can notify (desktop native, mobile push).
+        event(new AlertCreated($alert));
+
+        return $alert;
     }
 }

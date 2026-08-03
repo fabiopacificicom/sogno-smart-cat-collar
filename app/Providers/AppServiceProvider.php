@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Events\AlertCreated;
 use App\Listeners\RunFirstBootMigrations;
+use App\Listeners\SendAlertNotification;
 use App\Services\AlertEngine;
 use App\Services\ProviderManager;
 use App\Services\SensorIngestService;
@@ -31,5 +33,9 @@ class AppServiceProvider extends ServiceProvider
         // database is empty. NativePHP sets the DB path to the user's app
         // data dir in production but doesn't migrate automatically.
         Event::listen(ApplicationBooted::class, RunFirstBootMigrations::class);
+
+        // Notify the user when a critical alert is raised (desktop native +
+        // mobile local push). Listener guards for platform/plugin availability.
+        Event::listen(AlertCreated::class, SendAlertNotification::class);
     }
 }

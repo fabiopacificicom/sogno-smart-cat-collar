@@ -1,0 +1,54 @@
+graph TD
+    Collar["🐱 Collar ESP32S3<br/>firmware Arduino<br/>reads sensors, POSTs data"]
+
+    Desktop["🖥️ Desktop App<br/>NativePHP Desktop v2<br/>Laravel + Electron shell"]
+
+    Mobile["📱 Mobile App<br/>NativePHP Mobile v3<br/>Laravel + Swift/Kotlin shell"]
+
+    InternalAPI["🔌 Internal API<br/>Laravel routes<br/>POST /api/sensor-data"]
+
+    DB["💾 SQLite<br/>Eloquent ORM<br/>offline-first"]
+
+    Providers["⚙️ Communication Providers"]
+    DirectAPI["DirectApiProvider<br/>collar → desktop POST"]
+    Telegram["TelegramProvider<br/>Telegram Bot API polling"]
+    Mock["MockDataProvider<br/>fake sensor data - dev"]
+
+    Settings["🔧 Settings Page<br/>Livewire form<br/>providers, thresholds, cats, tunnel"]
+
+    Dashboard["📊 Dashboard<br/>Livewire components<br/>cat health cards, charts, alerts"]
+
+    Tray["📌 System Tray<br/>NativePHP Window class<br/>cat status icon"]
+
+    Alerts["🚨 Alert Engine<br/>evaluates thresholds<br/>triggers notifications"]
+
+    Notifications["🔔 Notifications<br/>Desktop: native alerts<br/>Mobile: push notifications"]
+
+    Setup["🚀 Setup Wizard<br/>first-boot only<br/>add cat, choose provider, set thresholds"]
+
+    Updater["🔄 Auto-Updater<br/>electron-updater<br/>in-app update UI"]
+
+    Collar -->|POST via tunnel| InternalAPI
+    InternalAPI --> Desktop
+    Telegram -->|poll| Providers
+    Mock -->|generate| Providers
+    DirectAPI --> Providers
+    Providers --> Desktop
+
+    Desktop --> DB
+    Desktop --> Setup
+    Desktop --> Dashboard
+    Desktop --> Tray
+    Desktop --> Settings
+    Desktop --> Alerts
+    Desktop --> Updater
+
+    Alerts --> Notifications
+
+    DB --> Mobile
+    Mobile --> Dashboard
+    Mobile --> Notifications
+
+    Settings --> Providers
+    Updater -->|"check on launch"| Desktop
+</content>
