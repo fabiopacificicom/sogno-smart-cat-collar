@@ -31,17 +31,27 @@ class MobileSyncService
     protected const HOST_KEY = 'mobile_hub_host';
 
     /**
-     * Whether the app is currently running on a phone (NativePHP Mobile),
-     * as opposed to the desktop Electron shell or a plain web server.
+     * Whether the *current request* is coming from a phone, as opposed to the
+     * desktop Electron shell or a desktop browser.
+     *
+     * We deliberately do NOT rely on Native\Mobile System::isMobile(): during
+     * Jump development the native bridge stays connected to the paired phone
+     * machine-wide, so isMobile() returns true even for the desktop browser.
+     * The reliable per-request signal is the User-Agent — the phone's webview
+     * (NativePHP app or Jump) presents as a mobile device.
      */
     public static function isMobileRuntime(): bool
     {
-        try {
-            return class_exists(\Native\Mobile\Facades\System::class)
-                && \Native\Mobile\Facades\System::isMobile();
-        } catch (\Throwable) {
+        $ua = strtolower((string) request()->userAgent());
+
+        if ($ua === '') {
             return false;
         }
+
+        return str_contains($ua, 'android')
+            || str_contains($ua, 'iphone')
+            || str_contains($ua, 'ipad')
+            || str_contains($ua, 'mobile');
     }
 
     /**
