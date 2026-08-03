@@ -1,168 +1,396 @@
-name: Build Desktop App
+name: Build & Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
+  checks: write
+
+env:
+  APP_NAME: Smart Cat Collar
+  DB_CONNECTION: sqlite
+  DB_DATABASE: ${{ github.workspace }}/database/database.sqlite
+  CACHE_STORE: file
+  SESSION_DRIVER: file
+  NATIVEPHP_APP_ID: com.pacificdev.smartcatcollar
+  GITHUB_REPO: smart-cats-collar-desktop
+  GITHUB_OWNER: fabiopacifici-bot
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        include:
-          - os: windows-latest
-            native_os: win
-            artifact_ext: exe
-          - os: ubuntu-latest
-            native_os: linux
-            artifact_ext: AppImage
-          - os: macos-latest
-            native_os: mac
-            artifact_ext: dmg
-
-    runs-on: ${{ matrix.os }}
-
+  # ── Step 1: Test ──
+  test:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, xml, curl, gd, bcmath, sqlite3, zip, fileinfo
+          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo
           tools: composer:v2
-          coverage: none
+
+      - name: Cache Composer deps
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+
+      - name: Install PHP deps
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          touch database/database.sqlite
+          mkdir -p storage/framework/{sessions,cache,views}
+
+      - name: Build frontend
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - name: Run Pest tests
+        run: php vendor/bin/pest 2>&1
+
+  # ── Step 2: Build Desktop (tagged releases) ──
+  desktop-linux:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo, zip
+          tools: composer:v2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      - name: Setup problem matchers for PHP
-        run: echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+      - name: Install PHP deps
+        run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Configure composer auth
-        run: composer config --no-interaction allow-plugins.nativephp/electron true
+      - name: Install NPM deps and build
+        run: |
+          npm ci
+          npm run build
 
-      - name: Install PHP dependencies (production)
-        env:
-          COMPOSER_PROCESS_TIMEOUT: 1800
-        run: composer install --no-dev --optimize-autoloader --no-interaction
-
-      - name: Create .env file
+      - name: Prepare environment
         run: |
           cp .env.example .env
-          php artisan key:generate --force
+          php artisan key:generate
+          echo "NATIVEPHP_APP_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> .env
+          echo "NATIVEPHP_UPDATER_PROVIDER=github" >> .env
+          echo "NATIVEPHP_UPDATER_ENABLED=true" >> .env
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Activate desktop config
+        run: php artisan native:use desktop
 
-      - name: Build frontend assets (Vite)
-        run: npm run build
+      - name: Build NativePHP desktop
+        run: php artisan native:build linux --no-interaction
 
-      - name: Build desktop app (${{ matrix.os }})
-        env:
-          NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
-          NATIVEPHP_APP_ID: com.smartcatcollar.desktop
-          NATIVEPHP_APP_AUTHOR: pacificDev
-          NATIVEPHP_APP_COPYRIGHT: "© ${{ github.ref_name }} pacificDev"
-          NATIVEPHP_APP_DESCRIPTION: "Smart Cat Collar — Desktop Companion App"
-          NATIVEPHP_APP_WEBSITE: "https://github.com/${{ github.repository }}"
-          APP_NAME: "Smart Cat Collar"
-          APP_URL: "http://localhost"
-          APP_ENV: production
-          APP_DEBUG: false
-          LOG_LEVEL: error
-        shell: bash
-        run: |
-          # Strip leading 'v' from version tag for electron-builder compatibility
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          echo "Using version: $VERSION"
-          NATIVEPHP_APP_VERSION="$VERSION" php artisan native:build ${{ matrix.native_os }} --no-interaction
-
-      - name: List build artifacts
-        shell: bash
-        run: |
-          echo "=== dist/ contents ==="
-          ls -la dist/
-          echo "=== dist/*-unpacked/ (if exists) ==="
-          ls -la dist/*-unpacked/ 2>/dev/null || echo "(none)"
-
-      - name: Upload build artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: smart-cat-collar-${{ matrix.native_os }}-${{ github.ref_name }}
-          path: |
-            dist/*.exe
-            dist/*.exe.blockmap
-            dist/*.dmg
-            dist/*.dmg.blockmap
-            dist/*.AppImage
-            dist/*.AppImage.blockmap
-            dist/*.deb
-            dist/*.rpm
-            dist/*.tar.gz
-            dist/*.zip
-            dist/*.yml
-            dist/*.yaml
-            dist/latest*.yml
-            dist/*.nupkg
-            dist/RELEASES
-          if-no-files-found: warn
+          name: smart-cat-collar-linux
+          path: dist/
 
+  desktop-macos:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo, zip
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PHP deps
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install NPM deps and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "NATIVEPHP_APP_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> .env
+          echo "NATIVEPHP_UPDATER_PROVIDER=github" >> .env
+          echo "NATIVEPHP_UPDATER_ENABLED=true" >> .env
+
+      - name: Activate desktop config
+        run: php artisan native:use desktop
+
+      - name: Build NativePHP desktop
+        run: php artisan native:build mac --no-interaction
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-cat-collar-macos
+          path: dist/
+
+  desktop-windows:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo, zip
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PHP deps
+        run: composer update --no-interaction --prefer-dist
+        env:
+          COMPOSER_HOME: ${{ runner.temp }}\composer
+
+      - name: Install NPM deps and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "NATIVEPHP_APP_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> .env
+          echo "NATIVEPHP_UPDATER_PROVIDER=github" >> .env
+          echo "NATIVEPHP_UPDATER_ENABLED=true" >> .env
+
+      - name: Activate desktop config
+        run: php artisan native:use desktop
+
+      - name: Build NativePHP desktop
+        run: php artisan native:build win --no-interaction
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-cat-collar-windows
+          path: dist\
+
+  # ── Step 3: Build Mobile Android (tagged releases) ──
+  mobile-android:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, sqlite3, pdo_sqlite, curl, fileinfo
+          tools: composer:v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PHP deps
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install NPM deps and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "NATIVEPHP_APP_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> .env
+          echo "NATIVEPHP_APP_VERSION_CODE=1" >> .env
+
+      - name: Activate mobile config
+        run: php artisan native:use mobile
+
+      - name: Install NativePHP Mobile
+        run: php artisan native:install --force --no-interaction
+
+      - name: Fix Android placeholders
+        run: |
+          GRADLE_FILE="nativephp/android/app/build.gradle.kts"
+          sed -i 's/REPLACE_COMPILE_SDK/36/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_MIN_SDK/24/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_TARGET_SDK/36/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_APP_ID/com.pacificdev.smartcatcollar.mobile/g' "$GRADLE_FILE"
+          sed -i 's/REPLACEMECODE/1/g' "$GRADLE_FILE"
+          APP_VER=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          sed -i "s/REPLACEME/${APP_VER}/g" "$GRADLE_FILE"
+          sed -i 's/REPLACE_MINIFY_ENABLED/false/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_SHRINK_RESOURCES/false/g' "$GRADLE_FILE"
+          sed -i 's/REPLACE_DEBUG_SYMBOLS/none/g' "$GRADLE_FILE"
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > nativephp/android/local.properties
+          MANIFEST="nativephp/android/app/src/main/AndroidManifest.xml"
+          sed -i 's/android:label="NativePHP"/android:label="Smart Cat Collar"/g' "$MANIFEST"
+          sed -i 's/package="[^"]*"/package="com.pacificdev.smartcatcollar.mobile"/g' "$MANIFEST"
+          echo "Placeholders replaced"
+
+      - name: Bundle Laravel app into Android assets
+        run: |
+          ASSETS_DIR="nativephp/android/app/src/main/assets"
+          BUNDLE_ZIP="${ASSETS_DIR}/laravel_bundle.zip"
+          STAGING="nativephp/android/laravel_staging"
+          mkdir -p "${ASSETS_DIR}" "${STAGING}"
+
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='nativephp' \
+            --exclude='*.zip' \
+            --exclude='*.jks' \
+            . "${STAGING}/"
+
+          composer install --no-dev --no-interaction --prefer-dist \
+            --optimize-autoloader --no-scripts \
+            --working-dir="${STAGING}"
+          composer dump-autoload --optimize --classmap-authoritative --no-scripts \
+            --working-dir="${STAGING}"
+
+          cp vendor/nativephp/mobile/bootstrap/android/artisan.php "${STAGING}/artisan.php"
+          cp .env "${STAGING}/.env"
+
+          mkdir -p "${STAGING}/bootstrap/cache"
+          mkdir -p "${STAGING}/storage/framework/cache"
+          mkdir -p "${STAGING}/storage/framework/sessions"
+          mkdir -p "${STAGING}/storage/framework/views"
+
+          rm -f "${STAGING}/bootstrap/cache/packages.php"
+          rm -f "${STAGING}/bootstrap/cache/services.php"
+
+          BUNDLE_ZIP_ABS="${GITHUB_WORKSPACE}/${BUNDLE_ZIP}"
+          cd "${STAGING}" && zip -r "${BUNDLE_ZIP_ABS}" . && cd -
+
+          echo "Bundle size: $(du -sh ${BUNDLE_ZIP_ABS} | cut -f1)"
+          ls -lh "${BUNDLE_ZIP_ABS}"
+
+      - name: Build Android APK
+        run: |
+          cd nativephp/android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find nativephp/android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "Found APK: $APK_PATH"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-cat-collar-android
+          path: ${{ steps.find_apk.outputs.apk_path }}
+
+  # ── Step 4: Create Release (tagged releases) ──
   release:
-    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop-linux, desktop-macos, desktop-windows, mobile-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
 
     steps:
-      - name: Download all build artifacts
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            git log --oneline --no-decorate > CHANGELOG.md
+          else
+            git log --oneline --no-decorate ${PREV_TAG}..HEAD > CHANGELOG.md
+          fi
+          {
+            echo 'changelog<<EOF'
+            cat CHANGELOG.md
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: smart-cat-collar-*
+          pattern: "smart-cat-collar-*"
+          path: "dist/"
           merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: List downloaded artifacts
-        run: ls -la
+      - name: Display artifacts
+        run: find dist/ -type f | sort
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: "Smart Cat Collar ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
           body: |
             ## Smart Cat Collar ${{ github.ref_name }}
 
-            Desktop Companion App for Smart Cat Collar.
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
 
             ### Downloads
-
-            | Platform | File |
-            |----------|------|
-            | Windows  | `Smart Cat Collar-*.exe` |
-            | macOS    | `Smart Cat Collar-*.dmg` |
-            | Linux    | `Smart Cat Collar-*.AppImage` |
-
-            ### Installation
-
-            - **Windows**: Run the `.exe` installer.
-            - **macOS**: Open the `.dmg` and drag to Applications.
-            - **Linux**: Make the `.AppImage` executable (`chmod +x`) and run.
-
-            ### Changelog
-
-            See the commit history for details.
+            - **Android**: app-debug.apk
+            - **Linux**: .AppImage, .deb (amd64 + arm64)
+            - **macOS**: .dmg (x64 + arm64)
+            - **Windows**: .exe
+          files: |
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.exe
+            dist/*.deb
+            dist/*.rpm
+            dist/*.apk
+            dist/*.msi
           draft: false
           prerelease: false
-          files: |
-            ./*
           fail_on_unmatched_files: false
